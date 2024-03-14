@@ -31,7 +31,16 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
         return;
     };
 
-    std.debug.print("project name: {s}\n", .{project.name});
+    const start_time = std.time.timestamp();
+    while (true) {
+        const elapsed = std.time.timestamp() - start_time;
+        const seconds: u8 = @intCast(@mod(elapsed, 60));
+        const minutes: u8 = @intCast(@divFloor(elapsed, 60));
+        std.debug.print("{s}: {d}:{d:0>2}\r", .{project.name, minutes, seconds});
+
+        const one_second = 1_000_000_000;
+        std.time.sleep(one_second);
+    }
 }
 
 fn findProject(id: []const u8) ?*Project {
