@@ -75,11 +75,8 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
         return;
     };
 
-    var entries = try arena.alloc(Entry, project.entries.len + 1);
-    @memcpy(entries[0..project.entries.len], project.entries);
-
-    var entry = &entries[project.entries.len];
-    project.entries = entries;
+    project.entries = try arena.realloc(project.entries, project.entries.len + 1);
+    var entry = &project.entries[project.entries.len - 1];
 
     var raw_start = std.time.timestamp();
     var raw_end = std.time.timestamp();
@@ -93,7 +90,7 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
         const elapsed = raw_now - raw_start;
         const seconds: u8 = @intCast(@mod(elapsed, 60));
         const minutes = getMinutes(elapsed);
-        std.debug.print("{s}: {d}:{d:0>2}\r", .{project.name, minutes, seconds});
+        std.debug.print("{s}: {d}:{d:0>2}          \r", .{project.name, minutes, seconds});
 
         const entry_minutes = getMinutes(raw_end - raw_start);
         if (entry_minutes != minutes) {
@@ -117,9 +114,8 @@ fn serialize() !void {
         try text.writer().print("id: {s}\n", .{project.id});
         try text.writer().print("name: {s}\n", .{project.name});
         try text.writer().print("entries_len: {d}\n", .{project.entries.len});
-        try text.writer().print("entries: ", .{});
         for (project.entries) |entry| {
-            try text.writer().print("{s}..{s};", .{entry.start.toString(), entry.end.toString()});
+            try text.writer().print("entry: {s}..{s}\n", .{entry.start.toString(), entry.end.toString()});
         }
         try text.writer().print("\n", .{});
     }
@@ -141,33 +137,41 @@ fn deserialize() !void {
     if (!std.mem.startsWith(u8, version_block, "version: 1")) return error.UnsupportedVersion;
 
     while (block_it.next()) |project_block| {
-        var project: Project = undefined;
+        if (std.mem.trim(u8, project_block, "\n\r\t ").len == 0) continue;
 
+        var project_id: []const u8 = undefined;
+        var project_name: []const u8 = undefined;
+        var entries: []Entry = undefined;
+
+        var parsed_entries: usize = 0;
         var line_it = std.mem.split(u8, project_block, "\n");
         while (line_it.next()) |line| {
             if (getTrimmedValue(line, "id")) |id| {
-                project.id = try arena.dupe(u8, id);
+                project_id = try arena.dupe(u8, id);
             } else if (getTrimmedValue(line, "name")) |name| {
-                project.name = try arena.dupe(u8, name);
+                project_name = try arena.dupe(u8, name);
             } else if (getTrimmedValue(line, "entries_len")) |len_str| {
                 const entries_len = try std.fmt.parseInt(usize, len_str, 10);
-                project.entries = try arena.alloc(Entry, entries_len);
-            } else if (getRawValue(line, "entries")) |entries_str| {
-                var entry_it = std.mem.split(u8, entries_str, ";");
-                for (project.entries) |*entry| {
-                    const entry_str = entry_it.next().?;
-                    var part_it = std.mem.split(u8, entry_str, "..");
-                    const start_str = part_it.next().?;
-                    const end_str = part_it.next().?;
-                    entry.* = .{
-                        .start = try Timestamp.fromString(start_str),
-                        .end = try Timestamp.fromString(end_str),
-                    };
-                }
+                entries = try arena.alloc(Entry, entries_len);
+            } else if (getTrimmedValue(line, "entry")) |entry_str| {
+                var part_it = std.mem.split(u8, entry_str, "..");
+                const start_str = part_it.next().?;
+                const end_str = part_it.next().?;
+                entries[parsed_entries] = .{
+                    .start = try Timestamp.fromString(start_str),
+                    .end = try Timestamp.fromString(end_str),
+                };
+                parsed_entries += 1;
             }
         }
 
-        try projects_list.append(project);
+        std.debug.assert(entries.len == parsed_entries);
+
+        try projects_list.append(.{
+            .id = project_id,
+            .name = project_name,
+            .entries = entries,
+        });
     }
 
     projects = projects_list.items;
