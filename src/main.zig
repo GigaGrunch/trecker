@@ -11,6 +11,8 @@ pub fn main() !void {
     arena = arena_impl.allocator();
     defer arena_impl.deinit();
 
+    std.debug.print("now: {}\n", .{Timestamp.now()});
+
     try deserialize();
 
     var args_it = try std.process.argsWithAllocator(arena);
@@ -211,4 +213,34 @@ const Project = struct {
 const Entry = struct {
     start: i64,
     end: i64,
+};
+
+const Timestamp = struct {
+    year: u16,
+    month: u4,
+    day: u5,
+    hour: u5,
+    minute: u6,
+    second: u6,
+
+    fn now() Timestamp {
+        const epoch_seconds = std.time.timestamp();
+        return fromEpochSeconds(@intCast(epoch_seconds));
+    }
+
+    fn fromEpochSeconds(seconds: u64) Timestamp {
+        const epoch_seconds = std.time.epoch.EpochSeconds { .secs = seconds };
+        const epoch_day = epoch_seconds.getEpochDay();
+        const day_seconds = epoch_seconds.getDaySeconds();
+        const year_day = epoch_day.calculateYearDay();
+        const month_day = year_day.calculateMonthDay();
+        return .{
+            .year = year_day.year,
+            .month = month_day.month.numeric(),
+            .day = 1 + month_day.day_index,
+            .hour = day_seconds.getHoursIntoDay(),
+            .minute = day_seconds.getMinutesIntoHour(),
+            .second = day_seconds.getSecondsIntoMinute(),
+        };
+    }
 };
