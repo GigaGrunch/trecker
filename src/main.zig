@@ -151,8 +151,18 @@ fn deserialize() !void {
             } else if (getTrimmedValue(line, "entries_len")) |len_str| {
                 const entries_len = try std.fmt.parseInt(usize, len_str, 10);
                 project.entries = try arena.alloc(Entry, entries_len);
-            } else if (getRawValue(line, "entries")) |entries| {
-                _ = entries;
+            } else if (getRawValue(line, "entries")) |entries_str| {
+                var entry_it = std.mem.split(u8, entries_str, ";");
+                for (project.entries) |*entry| {
+                    const entry_str = entry_it.next().?;
+                    var part_it = std.mem.split(u8, entry_str, ",");
+                    const start_str = part_it.next().?;
+                    const end_str = part_it.next().?;
+                    entry.* = .{
+                        .start = try std.fmt.parseInt(i64, start_str, 10),
+                        .end = try std.fmt.parseInt(i64, end_str, 10),
+                    };
+                }
             }
         }
 
