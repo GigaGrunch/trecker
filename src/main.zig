@@ -46,6 +46,8 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
         .end = std.time.timestamp(),
     };
 
+    try serialize();
+
     while (true) {
         const now = std.time.timestamp();
         const elapsed = now - entry.start;
@@ -65,7 +67,23 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
 }
 
 fn serialize() !void {
-    std.debug.print("serialize!\n", .{});
+    var text = std.ArrayList(u8).init(gpa);
+    defer text.deinit();
+
+    try text.writer().print("version: 1\n\n", .{});
+
+    for (projects) |project| {
+        try text.writer().print("id: {s}\n", .{project.id});
+        try text.writer().print("name: {s}\n", .{project.name});
+        try text.writer().print("entries_len: {d}\n", .{project.entries.len});
+        try text.writer().print("entries: ", .{});
+        for (project.entries) |entry| {
+            try text.appendSlice(&std.mem.toBytes(entry));
+        }
+        try text.writer().print("\n", .{});
+    }
+
+    try std.fs.cwd().writeFile("ztracker_session.ini", text.items);
 }
 
 fn getMinutes(seconds: i64) u64 {
