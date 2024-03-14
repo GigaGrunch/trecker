@@ -63,6 +63,7 @@ fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
         };
 
     var project_hours = try arena.alloc(f64, projects.len);
+    var total_hours: f64 = 0;
 
     for (entries) |entry| {
         if (entry.start.month != month) continue;
@@ -71,11 +72,14 @@ fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
             if (std.mem.eql(u8, project.id, entry.project_id)) break i;
         } else unreachable;
 
-        project_hours[project_index] += entry.getHours();
+        const hours = entry.getHours();
+        project_hours[project_index] += hours;
+        total_hours += hours;
     }
 
+    std.debug.print("Total: {d:.2} hours ({d:.0} %)\n", .{total_hours, 100.0 * total_hours / total_hours});
     for (projects, project_hours) |project, hours| {
-        std.debug.print("{s}: {d:.2} hours\n", .{project.name, hours});
+        std.debug.print("{s}: {d:.2} ({d:.0} %) hours\n", .{project.name, hours, 100.0 * hours / total_hours});
     }
 }
 
