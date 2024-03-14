@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const exe_name = "trecker";
+
 var gpa: std.mem.Allocator = undefined;
 var arena: std.mem.Allocator = undefined;
 
@@ -19,7 +21,7 @@ pub fn main() !void {
     var args_it = try std.process.argsWithAllocator(arena);
     _ = args_it.next().?; // first arg is the exe's name
     const command = args_it.next() orelse {
-        std.debug.print("Usage: ztracker <command> [args...]\n", .{});
+        std.debug.print("Usage: " ++ exe_name ++ " <command> [args...]\n", .{});
         return;
     };
 
@@ -38,7 +40,7 @@ pub fn main() !void {
 
 fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
     const month_str = args_it.next() orelse {
-        std.debug.print("Usage: ztracker summary <month>\n", .{});
+        std.debug.print("Usage: " ++ exe_name ++ " summary <month>\n", .{});
         return;
     };
 
@@ -78,7 +80,7 @@ fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
 }
 
 fn executeAddCommand(args_it: *std.process.ArgIterator) !void {
-    const usage = "Usage: ztracker add <project_it> <project_name>\n";
+    const usage = "Usage: " ++ exe_name ++ " add <project_it> <project_name>\n";
     const project_id = args_it.next() orelse {
         std.debug.print(usage, .{});
         return;
@@ -107,7 +109,7 @@ fn executeListCommand(args_it: *std.process.ArgIterator) !void {
 
 fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
     const project_id = args_it.next() orelse {
-        std.debug.print("Usage: ztracker start <project_id>\n", .{});
+        std.debug.print("Usage: " ++ exe_name ++ " start <project_id>\n", .{});
         return;
     };
     var project = findProject(project_id) orelse {
@@ -166,11 +168,11 @@ fn serialize() !void {
         try text.writer().print("entry: {s} {s}..{s}\n", .{ entry.project_id, entry.start.toString(), entry.end.toString() });
     }
 
-    try std.fs.cwd().writeFile("ztracker_session.ini", text.items);
+    try std.fs.cwd().writeFile(exe_name ++ "_session.ini", text.items);
 }
 
 fn deserialize() !void {
-    const text = std.fs.cwd().readFileAlloc(gpa, "ztracker_session.ini", 1024 * 1024 * 1024) catch |err| {
+    const text = std.fs.cwd().readFileAlloc(gpa, exe_name ++ "_session.ini", 1024 * 1024 * 1024) catch |err| {
         if (err == error.FileNotFound) return;
         return err;
     };
