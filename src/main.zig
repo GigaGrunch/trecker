@@ -24,7 +24,7 @@ pub fn main() !void {
     };
 
     if (std.mem.eql(u8, command, "start")) {
-        // try executeStartCommand(&args_it);
+        try executeStartCommand(&args_it);
     } else if (std.mem.eql(u8, command, "add")) {
         try executeAddCommand(&args_it);
     } else if (std.mem.eql(u8, command, "list")) {
@@ -77,12 +77,13 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
         return;
     };
 
-    project.entries = try arena.realloc(project.entries, project.entries.len + 1);
-    var entry = &project.entries[project.entries.len - 1];
+    entries = try arena.realloc(entries, entries.len + 1);
+    var entry = &entries[entries.len - 1];
 
     var raw_start = std.time.timestamp();
     var raw_end = std.time.timestamp();
     entry.* = Entry {
+        .project_id = project.id,
         .start = Timestamp.now(),
         .end = Timestamp.now(),
     };
@@ -110,10 +111,16 @@ fn serialize() !void {
     var text = std.ArrayList(u8).init(gpa);
     defer text.deinit();
 
-    try text.writer().print("version: 1\n\n", .{});
+    try text.writer().print("version: 1\n", .{});
 
+    try text.writer().print("\n", .{});
     for (projects) |project| {
         try text.writer().print("project: {s} '{s}'\n", .{project.id, project.name});
+    }
+
+    try text.writer().print("\n", .{});
+    for (entries) |entry| {
+        try text.writer().print("entry: {s} {s}..{s}\n", .{entry.project_id, entry.start.toString(), entry.end.toString()});
     }
 
     try std.fs.cwd().writeFile("ztracker_session.ini", text.items);
@@ -128,6 +135,8 @@ fn deserialize() !void {
 
     var projects_list = std.ArrayList(Project).init(gpa);
     defer projects_list.deinit();
+    var entries_list = std.ArrayList(Entry).init(gpa);
+    defer entries_list.deinit();
 
     var lines_it = std.mem.split(u8, text, "\n");
     const version_line = lines_it.next().?;
@@ -136,17 +145,31 @@ fn deserialize() !void {
 
     while (lines_it.next()) |line| {
         if (getTrimmedValue(line, "project")) |project_str| {
-            var proj_it = std.mem.split(u8, project_str, " ");
-            const id = proj_it.next().?;
-            const name = std.mem.trim(u8, project_str[id.len + 1..], "'");
+            var space_split = std.mem.split(u8, project_str, " ");
+            const id = space_split.next().?;
+            const rest = project_str[id.len + 1..];
+            const name = std.mem.trim(u8, rest, "'");
             try projects_list.append(.{
                 .id = try arena.dupe(u8, id),
                 .name = try arena.dupe(u8, name),
+            });
+        } else if (getTrimmedValue(line, "entry")) |entry_str| {
+            var space_split = std.mem.split(u8, entry_str, " ");
+            const project_id = space_split.next().?;
+            const rest = entry_str[project_id.len + 1..];
+            var range_it = std.mem.split(u8, rest, "..");
+            const start_str = range_it.next().?;
+            const end_str = range_it.next().?;
+            try entries_list.append(.{
+                .project_id = try arena.dupe(u8, project_id),
+                .start = try Timestamp.fromString(start_str),
+                .end = try Timestamp.fromString(end_str),
             });
         }
     }
 
     projects = try arena.dupe(Project, projects_list.items);
+    entries = try arena.dupe(Entry, entries_list.items);
 }
 
 fn getTrimmedValue(line: []const u8, comptime name: []const u8) ?[]const u8 {
