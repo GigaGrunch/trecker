@@ -22,8 +22,41 @@ pub fn main() !void {
 
     if (std.mem.eql(u8, command, "start")) {
         try executeStartCommand(&args_it);
+    } else if (std.mem.eql(u8, command, "add")) {
+        try executeAddCommand(&args_it);
+    } else if (std.mem.eql(u8, command, "list")) {
+        try executeListCommand(&args_it);
     } else {
         std.debug.print("Unknown command: {s}\n", .{command});
+    }
+}
+
+fn executeAddCommand(args_it: *std.process.ArgIterator) !void {
+    const usage = "Usage: ztracker add <project_it> <project_name>\n";
+    const project_id = args_it.next() orelse {
+        std.debug.print(usage, .{});
+        return;
+    };
+    const project_name = args_it.next() orelse {
+        std.debug.print(usage, .{});
+        return;
+    };
+
+    projects = try arena.realloc(projects, projects.len + 1);
+    projects[projects.len - 1] = .{
+        .id = try arena.dupe(u8, project_id),
+        .name = try arena.dupe(u8, project_name),
+        .entries = &.{},
+    };
+
+    try serialize();
+}
+
+fn executeListCommand(args_it: *std.process.ArgIterator) !void {
+    _ = args_it;
+    std.debug.print("{d} registered projects:\n", .{projects.len});
+    for (projects) |project| {
+        std.debug.print("{s}: {s}\n", .{project.id, project.name});
     }
 }
 
@@ -85,7 +118,7 @@ fn serialize() !void {
         try text.writer().print("entries_len: {d}\n", .{project.entries.len});
         try text.writer().print("entries: ", .{});
         for (project.entries) |entry| {
-            try text.appendSlice(&std.mem.toBytes(entry));
+            try text.writer().print("{d},{d};", .{entry.start, entry.end});
         }
         try text.writer().print("\n", .{});
     }
@@ -94,7 +127,10 @@ fn serialize() !void {
 }
 
 fn deserialize() !void {
-    const text = try std.fs.cwd().readFileAlloc(gpa, "ztracker_session.ini", 1024 * 1024 * 1024);
+    const text = std.fs.cwd().readFileAlloc(gpa, "ztracker_session.ini", 1024 * 1024 * 1024) catch |err| {
+        if (err == error.FileNotFound) return;
+        return err;
+    };
     defer gpa.free(text);
 
     var projects_list = std.ArrayList(Project).init(arena);
@@ -109,24 +145,14 @@ fn deserialize() !void {
         var line_it = std.mem.split(u8, project_block, "\n");
         while (line_it.next()) |line| {
             if (getTrimmedValue(line, "id")) |id| {
-                var id_copy = try arena.alloc(u8, id.len);
-                @memcpy(id_copy, id);
-                project.id = id_copy;
+                project.id = try arena.dupe(u8, id);
             } else if (getTrimmedValue(line, "name")) |name| {
-                var name_copy = try arena.alloc(u8, name.len);
-                @memcpy(name_copy, name);
-                project.name = name_copy;
+                project.name = try arena.dupe(u8, name);
             } else if (getTrimmedValue(line, "entries_len")) |len_str| {
                 const entries_len = try std.fmt.parseInt(usize, len_str, 10);
                 project.entries = try arena.alloc(Entry, entries_len);
-            } else if (getRawValue(line, "entries")) |entries_raw| {
-                for (project.entries, 0..) |*entry, i| {
-                    const entry_start = i * @sizeOf(Entry);
-                    const entry_end = entry_start + @sizeOf(Entry);
-                    var array: [@sizeOf(Entry)]u8 = undefined;
-                    @memcpy(&array, entries_raw[entry_start..entry_end]);
-                    entry.* = std.mem.bytesToValue(Entry, &array);
-                }
+            } else if (getRawValue(line, "entries")) |entries| {
+                _ = entries;
             }
         }
 
