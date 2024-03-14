@@ -26,5 +26,28 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
         std.debug.print("Usage: ztracker start <project_id>\n", .{});
         return;
     };
-    std.debug.print("project name: {s}\n", .{project_id});
+    var project = findProject(project_id) orelse {
+        std.debug.print("Project with given ID not found: {s}\n", .{project_id});
+        return;
+    };
+
+    std.debug.print("project name: {s}\n", .{project.name});
 }
+
+fn findProject(id: []const u8) ?*Project {
+    for (&projects) |*project| {
+        if (std.mem.eql(u8, id, project.id)) {
+            return project;
+        }
+    }
+    return null;
+}
+
+var projects = [_]Project {
+    .{ .id = "rnd", .name = "R&D" },
+};
+
+const Project = struct {
+    id: []const u8,
+    name: []const u8,
+};
