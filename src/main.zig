@@ -29,8 +29,51 @@ pub fn main() !void {
         try executeAddCommand(&args_it);
     } else if (std.mem.eql(u8, command, "list")) {
         try executeListCommand(&args_it);
+    } else if (std.mem.eql(u8, command, "summary")) {
+        try executeSummaryCommand(&args_it);
     } else {
         std.debug.print("Unknown command: {s}\n", .{command});
+    }
+}
+
+fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
+    const month_str = args_it.next() orelse {
+        std.debug.print("Usage: ztracker summary <month>\n", .{});
+        return;
+    };
+
+    const month: u4 =
+        if (std.mem.eql(u8, month_str, "january")) 1
+        else if (std.mem.eql(u8, month_str, "february")) 2
+        else if (std.mem.eql(u8, month_str, "march")) 3
+        else if (std.mem.eql(u8, month_str, "april")) 4
+        else if (std.mem.eql(u8, month_str, "may")) 5
+        else if (std.mem.eql(u8, month_str, "june")) 6
+        else if (std.mem.eql(u8, month_str, "july")) 7
+        else if (std.mem.eql(u8, month_str, "august")) 8
+        else if (std.mem.eql(u8, month_str, "september")) 9
+        else if (std.mem.eql(u8, month_str, "october")) 10
+        else if (std.mem.eql(u8, month_str, "november")) 11
+        else if (std.mem.eql(u8, month_str, "december")) 12
+        else {
+            std.debug.print("Unknown month: '{s}'\n", .{month_str});
+            return;
+        };
+
+    var project_hours = try arena.alloc(f64, projects.len);
+
+    for (entries) |entry| {
+        if (entry.start.month != month) continue;
+
+        const project_index = for (projects, 0..) |project, i| {
+            if (std.mem.eql(u8, project.id, entry.project_id)) break i;
+        } else unreachable;
+
+        project_hours[project_index] += entry.getHours();
+    }
+
+    for (projects, project_hours) |project, hours| {
+        std.debug.print("{s}: {d:.2} hours\n", .{project.name, hours});
     }
 }
 
@@ -58,7 +101,7 @@ fn executeListCommand(args_it: *std.process.ArgIterator) !void {
     _ = args_it;
     std.debug.print("{d} registered projects:\n", .{projects.len});
     for (projects) |project| {
-        std.debug.print("{s}: {s}\n", .{project.id, project.name});
+        std.debug.print("{s}: {s}\n", .{ project.id, project.name });
     }
 }
 
@@ -82,7 +125,7 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
 
     var raw_start = std.time.timestamp();
     var raw_end = std.time.timestamp();
-    entry.* = Entry {
+    entry.* = Entry{
         .project_id = project.id,
         .start = Timestamp.now(),
         .end = Timestamp.now(),
@@ -93,7 +136,7 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
         const elapsed = raw_now - raw_start;
         const seconds: u8 = @intCast(@mod(elapsed, 60));
         const minutes = getMinutes(elapsed);
-        std.debug.print("{s}: {d}:{d:0>2}          \r", .{project.name, minutes, seconds});
+        std.debug.print("{s}: {d}:{d:0>2}          \r", .{ project.name, minutes, seconds });
 
         const entry_minutes = getMinutes(raw_end - raw_start);
         if (entry_minutes != minutes) {
@@ -115,12 +158,12 @@ fn serialize() !void {
 
     try text.writer().print("\n", .{});
     for (projects) |project| {
-        try text.writer().print("project: {s} '{s}'\n", .{project.id, project.name});
+        try text.writer().print("project: {s} '{s}'\n", .{ project.id, project.name });
     }
 
     try text.writer().print("\n", .{});
     for (entries) |entry| {
-        try text.writer().print("entry: {s} {s}..{s}\n", .{entry.project_id, entry.start.toString(), entry.end.toString()});
+        try text.writer().print("entry: {s} {s}..{s}\n", .{ entry.project_id, entry.start.toString(), entry.end.toString() });
     }
 
     try std.fs.cwd().writeFile("ztracker_session.ini", text.items);
@@ -147,7 +190,7 @@ fn deserialize() !void {
         if (getTrimmedValue(line, "project")) |project_str| {
             var space_split = std.mem.split(u8, project_str, " ");
             const id = space_split.next().?;
-            const rest = project_str[id.len + 1..];
+            const rest = project_str[id.len + 1 ..];
             const name = std.mem.trim(u8, rest, "'");
             try projects_list.append(.{
                 .id = try arena.dupe(u8, id),
@@ -156,7 +199,7 @@ fn deserialize() !void {
         } else if (getTrimmedValue(line, "entry")) |entry_str| {
             var space_split = std.mem.split(u8, entry_str, " ");
             const project_id = space_split.next().?;
-            const rest = entry_str[project_id.len + 1..];
+            const rest = entry_str[project_id.len + 1 ..];
             var range_it = std.mem.split(u8, rest, "..");
             const start_str = range_it.next().?;
             const end_str = range_it.next().?;
@@ -203,7 +246,23 @@ const Entry = struct {
     project_id: []const u8,
     start: Timestamp,
     end: Timestamp,
+
+    fn getHours(entry: Entry) f64 {
+        const start = entry.start;
+        const end = entry.end;
+        std.debug.assert(start.year == end.year);
+        std.debug.assert(start.month == end.month);
+        std.debug.assert(start.day == end.day);
+        const hour_diff = float(end.hour) - float(start.hour);
+        const minute_diff = float(end.minute) - float(start.minute);
+        const second_diff = float(end.second) - float(start.second);
+        return hour_diff + minute_diff / 60.0 + second_diff / 60.0 / 60.0;
+    }
 };
+
+fn float(int: anytype) f64 {
+    return @floatFromInt(int);
+}
 
 const Timestamp = struct {
     year: u16,
@@ -219,7 +278,7 @@ const Timestamp = struct {
     }
 
     fn fromEpochSeconds(seconds: u64) Timestamp {
-        const epoch_seconds = std.time.epoch.EpochSeconds { .secs = seconds };
+        const epoch_seconds = std.time.epoch.EpochSeconds{ .secs = seconds };
         const epoch_day = epoch_seconds.getEpochDay();
         const day_seconds = epoch_seconds.getDaySeconds();
         const year_day = epoch_day.calculateYearDay();
@@ -237,9 +296,7 @@ const Timestamp = struct {
     const string_len = "1993-04-06_17-00-00".len;
     fn toString(t: Timestamp) [string_len]u8 {
         var buffer: [string_len]u8 = undefined;
-        _ = std.fmt.bufPrint(&buffer, "{d:0>4}-{d:0>2}-{d:0>2}_{d:0>2}-{d:0>2}-{d:0>2}", .{
-            t.year, t.month, t.day, t.hour, t.minute, t.second
-        }) catch unreachable;
+        _ = std.fmt.bufPrint(&buffer, "{d:0>4}-{d:0>2}-{d:0>2}_{d:0>2}-{d:0>2}-{d:0>2}", .{ t.year, t.month, t.day, t.hour, t.minute, t.second }) catch unreachable;
         return buffer;
     }
 
