@@ -152,9 +152,10 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
     while (true) {
         const raw_now = std.time.timestamp();
         const elapsed = raw_now - raw_start;
-        const seconds: u8 = @intCast(@mod(elapsed, 60));
+        const seconds = getSeconds(elapsed);
         const minutes = getMinutes(elapsed);
-        std.debug.print("{s}: {d}:{d:0>2}          \r", .{ project.name, minutes, seconds });
+        const hours = getHours(elapsed);
+        std.debug.print("{s}: {d}:{d:0>2}:{d:0>2}          \r", .{ project.name, hours, minutes, seconds });
 
         const entry_minutes = getMinutes(raw_end - raw_start);
         if (entry_minutes != minutes) {
@@ -242,8 +243,16 @@ fn getTrimmedValue(line: []const u8, comptime name: []const u8) ?[]const u8 {
     return null;
 }
 
-fn getMinutes(seconds: i64) u64 {
-    return @intCast(@divFloor(seconds, 60));
+fn getSeconds(total_seconds: i64) u64 {
+    return @intCast(@mod(total_seconds, 60));
+}
+
+fn getMinutes(total_seconds: i64) u64 {
+    return @intCast(@mod(@divFloor(total_seconds, 60), 60));
+}
+
+fn getHours(total_seconds: i64) u64 {
+    return @intCast(@divFloor(total_seconds, 60 * 60));
 }
 
 fn findProject(id: []const u8) ?*Project {
