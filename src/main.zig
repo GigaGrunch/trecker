@@ -3,6 +3,9 @@ const std = @import("std");
 var gpa: std.mem.Allocator = undefined;
 var arena: std.mem.Allocator = undefined;
 
+var projects: []Project = undefined;
+var entries: []Entry = undefined;
+
 pub fn main() !void {
     var gpa_impl = std.heap.GeneralPurposeAllocator(.{}){};
     gpa = gpa_impl.allocator();
@@ -21,7 +24,7 @@ pub fn main() !void {
     };
 
     if (std.mem.eql(u8, command, "start")) {
-        try executeStartCommand(&args_it);
+        // try executeStartCommand(&args_it);
     } else if (std.mem.eql(u8, command, "add")) {
         try executeAddCommand(&args_it);
     } else if (std.mem.eql(u8, command, "list")) {
@@ -46,7 +49,6 @@ fn executeAddCommand(args_it: *std.process.ArgIterator) !void {
     projects[projects.len - 1] = .{
         .id = try arena.dupe(u8, project_id),
         .name = try arena.dupe(u8, project_name),
-        .entries = &.{},
     };
 
     try serialize();
@@ -111,13 +113,7 @@ fn serialize() !void {
     try text.writer().print("version: 1\n\n", .{});
 
     for (projects) |project| {
-        try text.writer().print("id: {s}\n", .{project.id});
-        try text.writer().print("name: {s}\n", .{project.name});
-        try text.writer().print("entries_len: {d}\n", .{project.entries.len});
-        for (project.entries) |entry| {
-            try text.writer().print("entry: {s}..{s}\n", .{entry.start.toString(), entry.end.toString()});
-        }
-        try text.writer().print("\n", .{});
+        try text.writer().print("project: {s} '{s}'\n", .{project.id, project.name});
     }
 
     try std.fs.cwd().writeFile("ztracker_session.ini", text.items);
@@ -130,64 +126,34 @@ fn deserialize() !void {
     };
     defer gpa.free(text);
 
-    var projects_list = std.ArrayList(Project).init(arena);
+    var projects_list = std.ArrayList(Project).init(gpa);
+    defer projects_list.deinit();
 
-    var block_it = std.mem.split(u8, text, "\n\n");
-    const version_block = block_it.next().?;
-    if (!std.mem.startsWith(u8, version_block, "version: 1")) return error.UnsupportedVersion;
+    var lines_it = std.mem.split(u8, text, "\n");
+    const version_line = lines_it.next().?;
+    const version = getTrimmedValue(version_line, "version");
+    if (version == null or !std.mem.eql(u8, version.?, "1")) return error.UnsupportedVersion;
 
-    while (block_it.next()) |project_block| {
-        if (std.mem.trim(u8, project_block, "\n\r\t ").len == 0) continue;
-
-        var project_id: []const u8 = undefined;
-        var project_name: []const u8 = undefined;
-        var entries: []Entry = undefined;
-
-        var parsed_entries: usize = 0;
-        var line_it = std.mem.split(u8, project_block, "\n");
-        while (line_it.next()) |line| {
-            if (getTrimmedValue(line, "id")) |id| {
-                project_id = try arena.dupe(u8, id);
-            } else if (getTrimmedValue(line, "name")) |name| {
-                project_name = try arena.dupe(u8, name);
-            } else if (getTrimmedValue(line, "entries_len")) |len_str| {
-                const entries_len = try std.fmt.parseInt(usize, len_str, 10);
-                entries = try arena.alloc(Entry, entries_len);
-            } else if (getTrimmedValue(line, "entry")) |entry_str| {
-                var part_it = std.mem.split(u8, entry_str, "..");
-                const start_str = part_it.next().?;
-                const end_str = part_it.next().?;
-                entries[parsed_entries] = .{
-                    .start = try Timestamp.fromString(start_str),
-                    .end = try Timestamp.fromString(end_str),
-                };
-                parsed_entries += 1;
-            }
+    while (lines_it.next()) |line| {
+        if (getTrimmedValue(line, "project")) |project_str| {
+            var proj_it = std.mem.split(u8, project_str, " ");
+            const id = proj_it.next().?;
+            const name = std.mem.trim(u8, project_str[id.len + 1..], "'");
+            try projects_list.append(.{
+                .id = try arena.dupe(u8, id),
+                .name = try arena.dupe(u8, name),
+            });
         }
-
-        std.debug.assert(entries.len == parsed_entries);
-
-        try projects_list.append(.{
-            .id = project_id,
-            .name = project_name,
-            .entries = entries,
-        });
     }
 
-    projects = projects_list.items;
-}
-
-fn getRawValue(line: []const u8, comptime name: []const u8) ?[]const u8 {
-    const prefix = name ++ ": ";
-    if (std.mem.startsWith(u8, line, prefix)) {
-        return line[prefix.len..];
-    }
-    return null;
+    projects = try arena.dupe(Project, projects_list.items);
 }
 
 fn getTrimmedValue(line: []const u8, comptime name: []const u8) ?[]const u8 {
-    if (getRawValue(line, name)) |raw_value| {
-        return std.mem.trim(u8, raw_value, "\n\r\t ");
+    const prefix = name ++ ": ";
+    if (std.mem.startsWith(u8, line, prefix)) {
+        const raw = line[prefix.len..];
+        return std.mem.trim(u8, raw, "\n\r\t ");
     }
     return null;
 }
@@ -205,15 +171,13 @@ fn findProject(id: []const u8) ?*Project {
     return null;
 }
 
-var projects: []Project = undefined;
-
 const Project = struct {
     id: []const u8,
     name: []const u8,
-    entries: []Entry,
 };
 
 const Entry = struct {
+    project_id: []const u8,
     start: Timestamp,
     end: Timestamp,
 };
