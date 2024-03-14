@@ -11,8 +11,6 @@ pub fn main() !void {
     arena = arena_impl.allocator();
     defer arena_impl.deinit();
 
-    std.debug.print("now: {}\n", .{Timestamp.now()});
-
     try deserialize();
 
     var args_it = try std.process.argsWithAllocator(arena);
@@ -83,23 +81,24 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
     var entry = &entries[project.entries.len];
     project.entries = entries;
 
+    var raw_start = std.time.timestamp();
+    var raw_end = std.time.timestamp();
     entry.* = Entry {
-        .start = std.time.timestamp(),
-        .end = std.time.timestamp(),
+        .start = Timestamp.now(),
+        .end = Timestamp.now(),
     };
 
-    try serialize();
-
     while (true) {
-        const now = std.time.timestamp();
-        const elapsed = now - entry.start;
+        const raw_now = std.time.timestamp();
+        const elapsed = raw_now - raw_start;
         const seconds: u8 = @intCast(@mod(elapsed, 60));
         const minutes = getMinutes(elapsed);
         std.debug.print("{s}: {d}:{d:0>2}\r", .{project.name, minutes, seconds});
 
-        const entry_minutes = getMinutes(entry.end - entry.start);
+        const entry_minutes = getMinutes(raw_end - raw_start);
         if (entry_minutes != minutes) {
-            entry.end = now;
+            raw_end = raw_now;
+            entry.end = Timestamp.now();
             try serialize();
         }
 
@@ -120,7 +119,7 @@ fn serialize() !void {
         try text.writer().print("entries_len: {d}\n", .{project.entries.len});
         try text.writer().print("entries: ", .{});
         for (project.entries) |entry| {
-            try text.writer().print("{d},{d};", .{entry.start, entry.end});
+            try text.writer().print("{s}..{s};", .{entry.start.toString(), entry.end.toString()});
         }
         try text.writer().print("\n", .{});
     }
@@ -157,12 +156,12 @@ fn deserialize() !void {
                 var entry_it = std.mem.split(u8, entries_str, ";");
                 for (project.entries) |*entry| {
                     const entry_str = entry_it.next().?;
-                    var part_it = std.mem.split(u8, entry_str, ",");
+                    var part_it = std.mem.split(u8, entry_str, "..");
                     const start_str = part_it.next().?;
                     const end_str = part_it.next().?;
                     entry.* = .{
-                        .start = try std.fmt.parseInt(i64, start_str, 10),
-                        .end = try std.fmt.parseInt(i64, end_str, 10),
+                        .start = try Timestamp.fromString(start_str),
+                        .end = try Timestamp.fromString(end_str),
                     };
                 }
             }
@@ -211,8 +210,8 @@ const Project = struct {
 };
 
 const Entry = struct {
-    start: i64,
-    end: i64,
+    start: Timestamp,
+    end: Timestamp,
 };
 
 const Timestamp = struct {
@@ -241,6 +240,27 @@ const Timestamp = struct {
             .hour = day_seconds.getHoursIntoDay(),
             .minute = day_seconds.getMinutesIntoHour(),
             .second = day_seconds.getSecondsIntoMinute(),
+        };
+    }
+
+    const string_len = "1993-04-06_17-00-00".len;
+    fn toString(t: Timestamp) [string_len]u8 {
+        var buffer: [string_len]u8 = undefined;
+        _ = std.fmt.bufPrint(&buffer, "{d:0>4}-{d:0>2}-{d:0>2}_{d:0>2}-{d:0>2}-{d:0>2}", .{
+            t.year, t.month, t.day, t.hour, t.minute, t.second
+        }) catch unreachable;
+        return buffer;
+    }
+
+    fn fromString(str: []const u8) !Timestamp {
+        var it = std.mem.tokenize(u8, str, "-_");
+        return .{
+            .year = try std.fmt.parseInt(u16, it.next().?, 10),
+            .month = try std.fmt.parseInt(u4, it.next().?, 10),
+            .day = try std.fmt.parseInt(u5, it.next().?, 10),
+            .hour = try std.fmt.parseInt(u5, it.next().?, 10),
+            .minute = try std.fmt.parseInt(u6, it.next().?, 10),
+            .second = try std.fmt.parseInt(u6, it.next().?, 10),
         };
     }
 };
