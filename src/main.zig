@@ -83,9 +83,17 @@ fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
         hours[1] = 0;
     }
 
+    var work_days: [31]Day = undefined;
+    var work_days_len: usize = 0;
+
     for (entries) |entry| {
         if (entry.start.month != month) continue;
         if (entry.start.year != year) continue;
+
+        if (std.mem.indexOfScalar(Day, work_days[0..work_days_len], entry.start.day) == null) {
+            work_days[work_days_len] = entry.start.day;
+            work_days_len += 1;
+        }
 
         const project_index = for (projects, 0..) |project, i| {
             if (std.mem.eql(u8, project.id, entry.project_id)) break i;
@@ -96,9 +104,11 @@ fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
         total_hours += hours;
     }
 
+    const avg_hours_per_day = total_hours / float(work_days_len);
+
     std.mem.sort(struct { *Project, f64 }, project_hours, {}, moreHours);
 
-    std.debug.print("Total: {d:.2} hours ({d:.0} %)\n", .{ total_hours, 100.0 * total_hours / total_hours });
+    std.debug.print("Total: {d:.2} hours ({d:.2} hours per day)\n", .{ total_hours, avg_hours_per_day });
     for (project_hours) |hours| {
         std.debug.print("{s}: {d:.2} hours ({d:.0} %)\n", .{ hours[0].name, hours[1], 100.0 * hours[1] / total_hours });
     }
@@ -305,13 +315,20 @@ fn float(int: anytype) f64 {
     return @floatFromInt(int);
 }
 
+const Year = u16;
+const Month = u4;
+const Day = u5;
+const Hour = u5;
+const Minute = u6;
+const Second = u6;
+
 const Timestamp = struct {
-    year: u16,
-    month: u4,
-    day: u5,
-    hour: u5,
-    minute: u6,
-    second: u6,
+    year: Year,
+    month: Month,
+    day: Day,
+    hour: Hour,
+    minute: Minute,
+    second: Second,
 
     fn now() Timestamp {
         const epoch_seconds = std.time.timestamp();
