@@ -19,9 +19,10 @@ pub fn main() !void {
     try deserialize();
 
     var args_it = try std.process.argsWithAllocator(arena);
-    _ = args_it.next().?; // first arg is the exe's name
+    _ = args_it.skip(); // first arg is the exe's name
     const command = args_it.next() orelse {
         std.debug.print("Usage: " ++ exe_name ++ " <command> [args...]\n", .{});
+        std.debug.print("    Commands: start, add, list, summary\n", .{});
         return;
     };
 
