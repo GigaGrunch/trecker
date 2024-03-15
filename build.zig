@@ -1,5 +1,11 @@
 const std = @import("std");
 
+comptime {
+    const expected_zig_version = .{ .major = 0, .minor = 11, .patch = 0 };
+    const compatible = @import("builtin").zig_version.order(expected_zig_version) == .eq;
+    if (!compatible) @compileError("Zig version 0.11.0 is required.");
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -14,7 +20,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
-    
+
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }

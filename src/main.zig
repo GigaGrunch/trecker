@@ -62,7 +62,7 @@ fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
             return;
         };
 
-    var project_hours = try arena.alloc(struct {*Project, f64}, projects.len);
+    var project_hours = try arena.alloc(struct { *Project, f64 }, projects.len);
     var total_hours: f64 = 0;
 
     for (projects, project_hours) |*project, *hours| {
@@ -82,15 +82,15 @@ fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
         total_hours += hours;
     }
 
-    std.mem.sort(struct {*Project, f64}, project_hours, {}, moreHours);
+    std.mem.sort(struct { *Project, f64 }, project_hours, {}, moreHours);
 
-    std.debug.print("Total: {d:.2} hours ({d:.0} %)\n", .{total_hours, 100.0 * total_hours / total_hours});
+    std.debug.print("Total: {d:.2} hours ({d:.0} %)\n", .{ total_hours, 100.0 * total_hours / total_hours });
     for (project_hours) |hours| {
-        std.debug.print("{s}: {d:.2} hours ({d:.0} %)\n", .{hours[0].name, hours[1], 100.0 * hours[1] / total_hours});
+        std.debug.print("{s}: {d:.2} hours ({d:.0} %)\n", .{ hours[0].name, hours[1], 100.0 * hours[1] / total_hours });
     }
 }
 
-fn moreHours(context: void, lhs: struct {*Project, f64}, rhs: struct {*Project, f64}) bool {
+fn moreHours(context: void, lhs: struct { *Project, f64 }, rhs: struct { *Project, f64 }) bool {
     _ = context;
     return lhs[1] > rhs[1];
 }
