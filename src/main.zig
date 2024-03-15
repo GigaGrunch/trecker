@@ -40,8 +40,13 @@ pub fn main() !void {
 }
 
 fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
+    const usage = "Usage: " ++ exe_name ++ " summary <month> <year>\n";
     const month_str = args_it.next() orelse {
-        std.debug.print("Usage: " ++ exe_name ++ " summary <month>\n", .{});
+        std.debug.print(usage, .{});
+        return;
+    };
+    const year_str = args_it.next() orelse {
+        std.debug.print(usage, .{});
         return;
     };
 
@@ -59,7 +64,6 @@ fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
         "november",
         "december",
     };
-
     const month: u4 = for (month_names, 1..) |month_name, number| {
         if (std.mem.eql(u8, month_str, month_name)) {
             break @intCast(number);
@@ -68,6 +72,8 @@ fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
         std.debug.print("Unknown month: '{s}'\n", .{month_str});
         return;
     };
+
+    const year = try std.fmt.parseInt(u16, year_str, 10);
 
     var project_hours = try arena.alloc(struct { *Project, f64 }, projects.len);
     var total_hours: f64 = 0;
@@ -79,6 +85,7 @@ fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
 
     for (entries) |entry| {
         if (entry.start.month != month) continue;
+        if (entry.start.year != year) continue;
 
         const project_index = for (projects, 0..) |project, i| {
             if (std.mem.eql(u8, project.id, entry.project_id)) break i;
