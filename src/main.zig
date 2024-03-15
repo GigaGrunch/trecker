@@ -44,23 +44,29 @@ fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
         return;
     };
 
-    const month: u4 =
-        if (std.mem.eql(u8, month_str, "january")) 1
-        else if (std.mem.eql(u8, month_str, "february")) 2
-        else if (std.mem.eql(u8, month_str, "march")) 3
-        else if (std.mem.eql(u8, month_str, "april")) 4
-        else if (std.mem.eql(u8, month_str, "may")) 5
-        else if (std.mem.eql(u8, month_str, "june")) 6
-        else if (std.mem.eql(u8, month_str, "july")) 7
-        else if (std.mem.eql(u8, month_str, "august")) 8
-        else if (std.mem.eql(u8, month_str, "september")) 9
-        else if (std.mem.eql(u8, month_str, "october")) 10
-        else if (std.mem.eql(u8, month_str, "november")) 11
-        else if (std.mem.eql(u8, month_str, "december")) 12
-        else {
-            std.debug.print("Unknown month: '{s}'\n", .{month_str});
-            return;
-        };
+    const month_names: []const []const u8 = &.{
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
+    };
+
+    const month: u4 = for (month_names, 1..) |month_name, number| {
+        if (std.mem.eql(u8, month_str, month_name)) {
+            break @intCast(number);
+        }
+    } else {
+        std.debug.print("Unknown month: '{s}'\n", .{month_str});
+        return;
+    };
 
     var project_hours = try arena.alloc(struct { *Project, f64 }, projects.len);
     var total_hours: f64 = 0;
