@@ -10,7 +10,14 @@ pub fn main() !void {
     var allocator = gpa.allocator();
     defer _ = gpa.deinit();
 
-    try deserialize(allocator);
+    var args_it = try std.process.argsWithAllocator(allocator);
+    _ = args_it.skip(); // first arg is the exe's name
+    const command = args_it.next() orelse {
+        std.debug.print("Usage: " ++ exe_name ++ " <command> [args...]\n", .{});
+        std.debug.print("    Commands: start, add, list, summary\n", .{});
+        return;
+    };
+
     defer {
         for (projects) |project| {
             project.deinit(allocator);
@@ -22,20 +29,12 @@ pub fn main() !void {
         allocator.free(entries);
     }
 
-    var args_it = try std.process.argsWithAllocator(allocator);
-    _ = args_it.skip(); // first arg is the exe's name
-    const command = args_it.next() orelse {
-        std.debug.print("Usage: " ++ exe_name ++ " <command> [args...]\n", .{});
-        std.debug.print("    Commands: start, add, list, summary\n", .{});
-        return;
-    };
-
     if (std.mem.eql(u8, command, "start")) {
         try executeStartCommand(allocator, &args_it);
     } else if (std.mem.eql(u8, command, "add")) {
         try executeAddCommand(allocator, &args_it);
     } else if (std.mem.eql(u8, command, "list")) {
-        try executeListCommand();
+        try executeListCommand(allocator);
     } else if (std.mem.eql(u8, command, "summary")) {
         try executeSummaryCommand(allocator, &args_it);
     } else {
@@ -78,6 +77,8 @@ fn executeSummaryCommand(allocator: std.mem.Allocator, args_it: *std.process.Arg
     };
 
     const year = try std.fmt.parseInt(u16, year_str, 10);
+
+    try deserialize(allocator, .{});
 
     var project_hours = try allocator.alloc(struct { *Project, f64 }, projects.len);
     defer allocator.free(project_hours);
@@ -134,7 +135,8 @@ fn executeAddCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIter
         return;
     };
 
-    projects = try allocator.realloc(projects, projects.len + 1);
+    try deserialize(allocator, .{ .extra_project = true });
+
     projects[projects.len - 1] = .{
         .id = try allocator.dupe(u8, project_id),
         .name = try allocator.dupe(u8, project_name),
@@ -143,7 +145,9 @@ fn executeAddCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIter
     try serialize(allocator);
 }
 
-fn executeListCommand() !void {
+fn executeListCommand(allocator: std.mem.Allocator) !void {
+    try deserialize(allocator, .{});
+
     std.debug.print("{d} registered projects:\n", .{projects.len});
     for (projects) |project| {
         std.debug.print("{s}: {s}\n", .{ project.id, project.name });
@@ -155,6 +159,9 @@ fn executeStartCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIt
         std.debug.print("Usage: " ++ exe_name ++ " start <project_id>\n", .{});
         return;
     };
+
+    try deserialize(allocator, .{ .extra_entry = true });
+
     var project = findProject(project_id) orelse {
         std.debug.print("Project with given ID not found: {s}\n", .{project_id});
         std.debug.print("Known IDs:", .{});
@@ -165,7 +172,6 @@ fn executeStartCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIt
         return;
     };
 
-    entries = try allocator.realloc(entries, entries.len + 1);
     var entry = &entries[entries.len - 1];
 
     var raw_start = std.time.timestamp();
@@ -215,7 +221,7 @@ fn serialize(allocator: std.mem.Allocator) !void {
     try std.fs.cwd().writeFile(exe_name ++ "_session.ini", text.items);
 }
 
-fn deserialize(allocator: std.mem.Allocator) !void {
+fn deserialize(allocator: std.mem.Allocator, options: struct { extra_project: bool = false, extra_entry: bool = false }) !void {
     const text = std.fs.cwd().readFileAlloc(allocator, exe_name ++ "_session.ini", 1024 * 1024 * 1024) catch |err| {
         if (err == error.FileNotFound) return;
         return err;
@@ -255,6 +261,13 @@ fn deserialize(allocator: std.mem.Allocator) !void {
                 .end = try Timestamp.fromString(end_str),
             });
         }
+    }
+
+    if (options.extra_project) {
+        try projects_list.append(undefined);
+    }
+    if (options.extra_entry) {
+        try entries_list.append(undefined);
     }
 
     projects = try allocator.dupe(Project, projects_list.items);
