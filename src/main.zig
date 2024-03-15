@@ -2,23 +2,27 @@ const std = @import("std");
 
 const exe_name = "trecker";
 
-var gpa: std.mem.Allocator = undefined;
-var arena: std.mem.Allocator = undefined;
-
 var projects: []Project = undefined;
 var entries: []Entry = undefined;
 
 pub fn main() !void {
-    var gpa_impl = std.heap.GeneralPurposeAllocator(.{}){};
-    gpa = gpa_impl.allocator();
-    defer _ = gpa_impl.deinit();
-    var arena_impl = std.heap.ArenaAllocator.init(gpa);
-    arena = arena_impl.allocator();
-    defer arena_impl.deinit();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var allocator = gpa.allocator();
+    defer _ = gpa.deinit();
 
-    try deserialize();
+    try deserialize(allocator);
+    defer {
+        for (projects) |project| {
+            project.deinit(allocator);
+        }
+        allocator.free(projects);
+        for (entries) |entry| {
+            entry.deinit(allocator);
+        }
+        allocator.free(entries);
+    }
 
-    var args_it = try std.process.argsWithAllocator(arena);
+    var args_it = try std.process.argsWithAllocator(allocator);
     _ = args_it.skip(); // first arg is the exe's name
     const command = args_it.next() orelse {
         std.debug.print("Usage: " ++ exe_name ++ " <command> [args...]\n", .{});
@@ -27,19 +31,19 @@ pub fn main() !void {
     };
 
     if (std.mem.eql(u8, command, "start")) {
-        try executeStartCommand(&args_it);
+        try executeStartCommand(allocator, &args_it);
     } else if (std.mem.eql(u8, command, "add")) {
-        try executeAddCommand(&args_it);
+        try executeAddCommand(allocator, &args_it);
     } else if (std.mem.eql(u8, command, "list")) {
-        try executeListCommand(&args_it);
+        try executeListCommand();
     } else if (std.mem.eql(u8, command, "summary")) {
-        try executeSummaryCommand(&args_it);
+        try executeSummaryCommand(allocator, &args_it);
     } else {
         std.debug.print("Unknown command: {s}\n", .{command});
     }
 }
 
-fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
+fn executeSummaryCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIterator) !void {
     const usage = "Usage: " ++ exe_name ++ " summary <month> <year>\n";
     const month_str = args_it.next() orelse {
         std.debug.print(usage, .{});
@@ -75,14 +79,14 @@ fn executeSummaryCommand(args_it: *std.process.ArgIterator) !void {
 
     const year = try std.fmt.parseInt(u16, year_str, 10);
 
-    var project_hours = try arena.alloc(struct { *Project, f64 }, projects.len);
-    var total_hours: f64 = 0;
-
+    var project_hours = try allocator.alloc(struct { *Project, f64 }, projects.len);
+    defer allocator.free(project_hours);
     for (projects, project_hours) |*project, *hours| {
         hours[0] = project;
         hours[1] = 0;
     }
 
+    var total_hours: f64 = 0;
     var work_days: [31]Day = undefined;
     var work_days_len: usize = 0;
 
@@ -119,7 +123,7 @@ fn moreHours(context: void, lhs: struct { *Project, f64 }, rhs: struct { *Projec
     return lhs[1] > rhs[1];
 }
 
-fn executeAddCommand(args_it: *std.process.ArgIterator) !void {
+fn executeAddCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIterator) !void {
     const usage = "Usage: " ++ exe_name ++ " add <project_it> <project_name>\n";
     const project_id = args_it.next() orelse {
         std.debug.print(usage, .{});
@@ -130,24 +134,23 @@ fn executeAddCommand(args_it: *std.process.ArgIterator) !void {
         return;
     };
 
-    projects = try arena.realloc(projects, projects.len + 1);
+    projects = try allocator.realloc(projects, projects.len + 1);
     projects[projects.len - 1] = .{
-        .id = try arena.dupe(u8, project_id),
-        .name = try arena.dupe(u8, project_name),
+        .id = try allocator.dupe(u8, project_id),
+        .name = try allocator.dupe(u8, project_name),
     };
 
-    try serialize();
+    try serialize(allocator);
 }
 
-fn executeListCommand(args_it: *std.process.ArgIterator) !void {
-    _ = args_it;
+fn executeListCommand() !void {
     std.debug.print("{d} registered projects:\n", .{projects.len});
     for (projects) |project| {
         std.debug.print("{s}: {s}\n", .{ project.id, project.name });
     }
 }
 
-fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
+fn executeStartCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIterator) !void {
     const project_id = args_it.next() orelse {
         std.debug.print("Usage: " ++ exe_name ++ " start <project_id>\n", .{});
         return;
@@ -162,7 +165,7 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
         return;
     };
 
-    entries = try arena.realloc(entries, entries.len + 1);
+    entries = try allocator.realloc(entries, entries.len + 1);
     var entry = &entries[entries.len - 1];
 
     var raw_start = std.time.timestamp();
@@ -185,7 +188,7 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
         if (entry_minutes != minutes) {
             raw_end = raw_now;
             entry.end = Timestamp.now();
-            try serialize();
+            try serialize(allocator);
         }
 
         const one_second = 1_000_000_000;
@@ -193,8 +196,8 @@ fn executeStartCommand(args_it: *std.process.ArgIterator) !void {
     }
 }
 
-fn serialize() !void {
-    var text = std.ArrayList(u8).init(gpa);
+fn serialize(allocator: std.mem.Allocator) !void {
+    var text = std.ArrayList(u8).init(allocator);
     defer text.deinit();
 
     try text.writer().print("version: 1\n", .{});
@@ -212,16 +215,16 @@ fn serialize() !void {
     try std.fs.cwd().writeFile(exe_name ++ "_session.ini", text.items);
 }
 
-fn deserialize() !void {
-    const text = std.fs.cwd().readFileAlloc(gpa, exe_name ++ "_session.ini", 1024 * 1024 * 1024) catch |err| {
+fn deserialize(allocator: std.mem.Allocator) !void {
+    const text = std.fs.cwd().readFileAlloc(allocator, exe_name ++ "_session.ini", 1024 * 1024 * 1024) catch |err| {
         if (err == error.FileNotFound) return;
         return err;
     };
-    defer gpa.free(text);
+    defer allocator.free(text);
 
-    var projects_list = std.ArrayList(Project).init(gpa);
+    var projects_list = std.ArrayList(Project).init(allocator);
     defer projects_list.deinit();
-    var entries_list = std.ArrayList(Entry).init(gpa);
+    var entries_list = std.ArrayList(Entry).init(allocator);
     defer entries_list.deinit();
 
     var lines_it = std.mem.split(u8, text, "\n");
@@ -236,8 +239,8 @@ fn deserialize() !void {
             const rest = project_str[id.len + 1 ..];
             const name = std.mem.trim(u8, rest, "'");
             try projects_list.append(.{
-                .id = try arena.dupe(u8, id),
-                .name = try arena.dupe(u8, name),
+                .id = try allocator.dupe(u8, id),
+                .name = try allocator.dupe(u8, name),
             });
         } else if (getTrimmedValue(line, "entry")) |entry_str| {
             var space_split = std.mem.split(u8, entry_str, " ");
@@ -247,15 +250,15 @@ fn deserialize() !void {
             const start_str = range_it.next().?;
             const end_str = range_it.next().?;
             try entries_list.append(.{
-                .project_id = try arena.dupe(u8, project_id),
+                .project_id = try allocator.dupe(u8, project_id),
                 .start = try Timestamp.fromString(start_str),
                 .end = try Timestamp.fromString(end_str),
             });
         }
     }
 
-    projects = try arena.dupe(Project, projects_list.items);
-    entries = try arena.dupe(Entry, entries_list.items);
+    projects = try allocator.dupe(Project, projects_list.items);
+    entries = try allocator.dupe(Entry, entries_list.items);
 }
 
 fn getTrimmedValue(line: []const u8, comptime name: []const u8) ?[]const u8 {
@@ -291,6 +294,11 @@ fn findProject(id: []const u8) ?*Project {
 const Project = struct {
     id: []const u8,
     name: []const u8,
+
+    fn deinit(project: Project, allocator: std.mem.Allocator) void {
+        allocator.free(project.id);
+        allocator.free(project.name);
+    }
 };
 
 const Entry = struct {
@@ -308,6 +316,10 @@ const Entry = struct {
         const minute_diff = float(end.minute) - float(start.minute);
         const second_diff = float(end.second) - float(start.second);
         return hour_diff + minute_diff / 60.0 + second_diff / 60.0 / 60.0;
+    }
+
+    fn deinit(entry: Entry, allocator: std.mem.Allocator) void {
+        allocator.free(entry.project_id);
     }
 };
 
