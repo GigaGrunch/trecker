@@ -105,7 +105,7 @@ fn executeSummaryCommand(allocator: std.mem.Allocator, args_it: *std.process.Arg
             if (std.mem.eql(u8, project.id, entry.project_id)) break i;
         } else unreachable;
 
-        const hours = entry.getHours();
+        const hours = entry.getTotalHours();
         project_hours[project_index][1] += hours;
         total_hours += hours;
     }
@@ -183,13 +183,25 @@ fn executeStartCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIt
         .end = Timestamp.now(),
     };
 
+    var initial_total_today: i64 = 0;
+    for (entries) |other| {
+        if (entry.start.year != other.start.year) continue;
+        if (entry.start.month != other.start.month) continue;
+        if (entry.start.day != other.start.day) continue;
+        initial_total_today += other.getTotalSeconds();
+    }
+
     while (true) {
         const raw_now = std.time.timestamp();
         const elapsed = raw_now - raw_start;
-        const seconds = getSeconds(elapsed);
-        const minutes = getMinutes(elapsed);
         const hours = getHours(elapsed);
-        std.debug.print("{s}: {d}:{d:0>2}:{d:0>2}          \r", .{ project.name, hours, minutes, seconds });
+        const minutes = getMinutes(elapsed);
+        const seconds = getSeconds(elapsed);
+        const total_today = elapsed + initial_total_today;
+        std.debug.print("\r{s}: {d}:{d:0>2}:{d:0>2} (Today: {d}:{d:0>2}:{d:0>2})          \r", .{
+            project.name, hours, minutes, seconds,
+            getHours(total_today), getMinutes(total_today), getSeconds(total_today)
+        });
 
         const entry_minutes = getMinutes(raw_end - raw_start);
         if (entry_minutes != minutes) {
@@ -320,16 +332,23 @@ const Entry = struct {
     start: Timestamp,
     end: Timestamp,
 
-    fn getHours(entry: Entry) f64 {
+    fn getTotalHours(entry: Entry) f64 {
+        return float(getTotalSeconds(entry)) / 60.0 / 60.0;
+    }
+
+    fn getTotalSeconds(entry: Entry) i64 {
         const start = entry.start;
         const end = entry.end;
         std.debug.assert(start.year == end.year);
         std.debug.assert(start.month == end.month);
         std.debug.assert(start.day == end.day);
-        const hour_diff = float(end.hour) - float(start.hour);
-        const minute_diff = float(end.minute) - float(start.minute);
-        const second_diff = float(end.second) - float(start.second);
-        return hour_diff + minute_diff / 60.0 + second_diff / 60.0 / 60.0;
+        var hour_diff: i64 = end.hour;
+        hour_diff -= start.hour;
+        var minute_diff: i64 = end.minute;
+        minute_diff -= start.minute;
+        var second_diff: i64 = end.second;
+        second_diff -= start.second;
+        return hour_diff * 60 * 60 + minute_diff * 60 + second_diff;
     }
 
     fn deinit(entry: Entry, allocator: std.mem.Allocator) void {
