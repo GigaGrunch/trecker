@@ -11,6 +11,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
 
     var args_it = try std.process.argsWithAllocator(allocator);
+    defer args_it.deinit();
     _ = args_it.skip(); // first arg is the exe's name
     const command = args_it.next() orelse {
         std.debug.print("Usage: " ++ exe_name ++ " <command> [args...]\n", .{});
