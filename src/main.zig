@@ -163,7 +163,7 @@ fn executeStartCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIt
 
     try deserialize(allocator, .{ .extra_entry = true });
 
-    var project = findProject(project_id) orelse {
+    const project = findProject(project_id) orelse {
         std.debug.print("Project with given ID not found: {s}\n", .{project_id});
         std.debug.print("Known IDs:", .{});
         for (projects) |project| {
@@ -175,7 +175,7 @@ fn executeStartCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIt
 
     var entry = &entries[entries.len - 1];
 
-    var raw_start = std.time.timestamp();
+    const raw_start = std.time.timestamp();
     var raw_end = std.time.timestamp();
     entry.* = Entry{
         .project_id = project.id,
