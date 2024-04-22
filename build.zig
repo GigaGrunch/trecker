@@ -1,9 +1,9 @@
 const std = @import("std");
 
 comptime {
-    const expected_zig_version = .{ .major = 0, .minor = 11, .patch = 0 };
+    const expected_zig_version = .{ .major = 0, .minor = 12, .patch = 0 };
     const compatible = @import("builtin").zig_version.order(expected_zig_version) == .eq;
-    if (!compatible) @compileError("Zig version 0.11.0 is required.");
+    if (!compatible) @compileError("Zig version 0.12.0 is required.");
 }
 
 pub fn build(b: *std.Build) void {
