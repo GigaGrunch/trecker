@@ -81,11 +81,11 @@ fn executeSummaryCommand(allocator: std.mem.Allocator, args_it: *std.process.Arg
 
     try deserialize(allocator, .{});
 
-    var project_hours = try allocator.alloc(struct { *Project, f64 }, projects.len);
-    defer allocator.free(project_hours);
-    for (projects, project_hours) |*project, *hours| {
-        hours[0] = project;
-        hours[1] = 0;
+    var project_hours = std.MultiArrayList(struct { *Project, f64 }){};
+    defer project_hours.deinit(allocator);
+
+    for (projects) |*project| {
+        try project_hours.append(allocator, .{ project, 0 });
     }
 
     var total_hours: f64 = 0;
@@ -106,23 +106,23 @@ fn executeSummaryCommand(allocator: std.mem.Allocator, args_it: *std.process.Arg
         } else unreachable;
 
         const hours = entry.getTotalHours();
-        project_hours[project_index][1] += hours;
+        project_hours.items(.@"1")[project_index] += hours;
         total_hours += hours;
     }
 
     const avg_hours_per_day = total_hours / float(work_days_len);
 
-    std.mem.sort(struct { *Project, f64 }, project_hours, {}, moreHours);
+    project_hours.sort(struct {
+        hours: []const f64,
+        pub fn lessThan(ctx: @This(), a: usize, b: usize) bool {
+            return ctx.hours[a] > ctx.hours[b];
+        }
+    }{ .hours = project_hours.items(.@"1") });
 
     std.debug.print("Total: {d:.2} hours ({d:.2} hours per day)\n", .{ total_hours, avg_hours_per_day });
-    for (project_hours) |hours| {
-        std.debug.print("{s}: {d:.2} hours ({d:.0} %)\n", .{ hours[0].name, hours[1], 100.0 * hours[1] / total_hours });
+    for (project_hours.items(.@"0"), project_hours.items(.@"1")) |project, hours| {
+        std.debug.print("{s}: {d:.2} hours ({d:.0} %)\n", .{ project.name, hours, 100.0 * hours / total_hours });
     }
-}
-
-fn moreHours(context: void, lhs: struct { *Project, f64 }, rhs: struct { *Project, f64 }) bool {
-    _ = context;
-    return lhs[1] > rhs[1];
 }
 
 fn executeAddCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIterator) !void {
