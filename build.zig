@@ -1,9 +1,12 @@
 const std = @import("std");
 
 comptime {
-    const expected_zig_version = .{ .major = 0, .minor = 12, .patch = 0 };
-    const compatible = @import("builtin").zig_version.order(expected_zig_version) == .eq;
-    if (!compatible) @compileError("Zig version 0.12.0 is required.");
+    const zig_version = .{ .major = 0, .minor = 13, .patch = 0 };
+    const compatible = @import("builtin").zig_version.order(zig_version) == .eq;
+    var buffer: [100]u8 = undefined;
+    var stream = std.io.fixedBufferStream(&buffer);
+    stream.writer().print("Zig version {d}.{d}.{d} is required.", .{ zig_version.major, zig_version.minor, zig_version.patch }) catch @compileError("Failed to print compile error.");
+    if (!compatible) @compileError(&buffer);
 }
 
 pub fn build(b: *std.Build) void {
@@ -12,7 +15,7 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "trecker",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });

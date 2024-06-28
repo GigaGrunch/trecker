@@ -198,10 +198,7 @@ fn executeStartCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIt
         const minutes = getMinutes(elapsed);
         const seconds = getSeconds(elapsed);
         const total_today = elapsed + initial_total_today;
-        std.debug.print("\r{s}: {d}:{d:0>2}:{d:0>2} (Today: {d}:{d:0>2}:{d:0>2})          \r", .{
-            project.name, hours, minutes, seconds,
-            getHours(total_today), getMinutes(total_today), getSeconds(total_today)
-        });
+        std.debug.print("\r{s}: {d}:{d:0>2}:{d:0>2} (Today: {d}:{d:0>2}:{d:0>2})          \r", .{ project.name, hours, minutes, seconds, getHours(total_today), getMinutes(total_today), getSeconds(total_today) });
 
         const entry_minutes = getMinutes(raw_end - raw_start);
         if (entry_minutes != minutes) {
@@ -231,7 +228,7 @@ fn serialize(allocator: std.mem.Allocator) !void {
         try text.writer().print("entry: {s} {s}..{s}\n", .{ entry.project_id, entry.start.toString(), entry.end.toString() });
     }
 
-    try std.fs.cwd().writeFile(exe_name ++ "_session.ini", text.items);
+    try std.fs.cwd().writeFile(.{ .sub_path = exe_name ++ "_session.ini", .data = text.items });
 }
 
 fn deserialize(allocator: std.mem.Allocator, options: struct { extra_project: bool = false, extra_entry: bool = false }) !void {
