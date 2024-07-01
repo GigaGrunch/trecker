@@ -1,0 +1,19 @@
+.{
+    .name = "trecker",
+    .version = "0.0.0",
+    .minimum_zig_version = "0.13.0",
+
+    .dependencies = .{
+        .flags = .{
+            .url = "https://github.com/n0s4/flags/archive/refs/tags/v0.5.0.tar.gz",
+            .hash = "12202e9d5de187569b77064c66a4972e8a824488295fab2f5c8cb48331eab9877257",
+        },
+    },
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+    },
+}
