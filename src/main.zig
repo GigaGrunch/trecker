@@ -1,4 +1,5 @@
 const std = @import("std");
+const flags = @import("flags");
 
 const exe_name = "trecker";
 
@@ -7,52 +8,46 @@ var entries: []Entry = undefined;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    var allocator = gpa.allocator();
+    const allocator = gpa.allocator();
     defer _ = gpa.deinit();
 
-    var args_it = try std.process.argsWithAllocator(allocator);
-    defer args_it.deinit();
-    _ = args_it.skip(); // first arg is the exe's name
-    const command = args_it.next() orelse {
-        std.debug.print("Usage: " ++ exe_name ++ " <command> [args...]\n", .{});
-        std.debug.print("    Commands: start, add, list, summary\n", .{});
-        return;
-    };
+    var args = try std.process.argsWithAllocator(allocator);
+    defer args.deinit();
+
+    const command = flags.parse(&args, Command);
 
     defer {
-        for (projects) |project| {
-            project.deinit(allocator);
-        }
+        for (projects) |project| project.deinit(allocator);
         allocator.free(projects);
-        for (entries) |entry| {
-            entry.deinit(allocator);
-        }
+        for (entries) |entry| entry.deinit(allocator);
         allocator.free(entries);
     }
 
-    if (std.mem.eql(u8, command, "start")) {
-        try executeStartCommand(allocator, &args_it);
-    } else if (std.mem.eql(u8, command, "add")) {
-        try executeAddCommand(allocator, &args_it);
-    } else if (std.mem.eql(u8, command, "list")) {
-        try executeListCommand(allocator);
-    } else if (std.mem.eql(u8, command, "summary")) {
-        try executeSummaryCommand(allocator, &args_it);
-    } else {
-        std.debug.print("Unknown command: {s}\n", .{command});
-    }
+    try switch (command.flags) {
+        .start => executeStartCommand(allocator, command.args),
+        .add => executeAddCommand(allocator, command.args),
+        .list => executeListCommand(allocator),
+        .summary => executeSummaryCommand(allocator, command.args),
+    };
 }
 
-fn executeSummaryCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIterator) !void {
-    const usage = "Usage: " ++ exe_name ++ " summary <month> <year>\n";
-    const month_str = args_it.next() orelse {
-        std.debug.print(usage, .{});
+const Command = union(enum) {
+    pub const name = exe_name;
+
+    start: struct{},
+    add: struct{},
+    list: struct{},
+    summary: struct{},
+};
+
+fn executeSummaryCommand(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    if (args.len < 2) {
+        std.debug.print("Usage: " ++ exe_name ++ " summary <month> <year>\n", .{});
         return;
-    };
-    const year_str = args_it.next() orelse {
-        std.debug.print(usage, .{});
-        return;
-    };
+    }
+
+    const month_str = args[0];
+    const year_str = args[1];
 
     const month_names: []const []const u8 = &.{
         "january",
@@ -125,16 +120,14 @@ fn executeSummaryCommand(allocator: std.mem.Allocator, args_it: *std.process.Arg
     }
 }
 
-fn executeAddCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIterator) !void {
-    const usage = "Usage: " ++ exe_name ++ " add <project_it> <project_name>\n";
-    const project_id = args_it.next() orelse {
-        std.debug.print(usage, .{});
+fn executeAddCommand(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    if (args.len < 2) {
+        std.debug.print("Usage: " ++ exe_name ++ " add <project_it> <project_name>\n", .{});
         return;
-    };
-    const project_name = args_it.next() orelse {
-        std.debug.print(usage, .{});
-        return;
-    };
+    }
+
+    const project_id = args[0];
+    const project_name = args[1];
 
     try deserialize(allocator, .{ .extra_project = true });
 
@@ -155,11 +148,13 @@ fn executeListCommand(allocator: std.mem.Allocator) !void {
     }
 }
 
-fn executeStartCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIterator) !void {
-    const project_id = args_it.next() orelse {
+fn executeStartCommand(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    if (args.len < 1) {
         std.debug.print("Usage: " ++ exe_name ++ " start <project_id>\n", .{});
         return;
-    };
+    }
+
+    const project_id = args[0];
 
     try deserialize(allocator, .{ .extra_entry = true });
 
@@ -232,10 +227,7 @@ fn serialize(allocator: std.mem.Allocator) !void {
 }
 
 fn deserialize(allocator: std.mem.Allocator, options: struct { extra_project: bool = false, extra_entry: bool = false }) !void {
-    const text = std.fs.cwd().readFileAlloc(allocator, exe_name ++ "_session.ini", 1024 * 1024 * 1024) catch |err| {
-        if (err == error.FileNotFound) return;
-        return err;
-    };
+    const text = try std.fs.cwd().readFileAlloc(allocator, exe_name ++ "_session.ini", 1024 * 1024 * 1024);
     defer allocator.free(text);
 
     var projects_list = std.ArrayList(Project).init(allocator);
