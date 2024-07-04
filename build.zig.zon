@@ -1,0 +1,19 @@
+.{
+    .name = "trecker",
+    .version = "0.0.0",
+    .minimum_zig_version = "0.13.0",
+
+    .dependencies = .{
+        .zli = .{
+            .url = "lib/zli",
+            .hash = "1220ff6a82ba9deb2ec4fda5a9ccc55f5dd89a7c33842050cf89da5fcac10089842c",
+        },
+    },
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+    },
+}
