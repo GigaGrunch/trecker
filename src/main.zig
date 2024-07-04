@@ -1,4 +1,5 @@
 const std = @import("std");
+const zli = @import("zli");
 
 const exe_name = "trecker";
 
@@ -7,17 +8,13 @@ var entries: []Entry = undefined;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    var allocator = gpa.allocator();
+    const allocator = gpa.allocator();
     defer _ = gpa.deinit();
 
     var args_it = try std.process.argsWithAllocator(allocator);
     defer args_it.deinit();
-    _ = args_it.skip(); // first arg is the exe's name
-    const command = args_it.next() orelse {
-        std.debug.print("Usage: " ++ exe_name ++ " <command> [args...]\n", .{});
-        std.debug.print("    Commands: start, add, list, summary\n", .{});
-        return;
-    };
+
+    const command = zli.parse(&args_it, Command);
 
     defer {
         for (projects) |project| {
@@ -30,30 +27,15 @@ pub fn main() !void {
         allocator.free(entries);
     }
 
-    if (std.mem.eql(u8, command, "start")) {
-        try executeStartCommand(allocator, &args_it);
-    } else if (std.mem.eql(u8, command, "add")) {
-        try executeAddCommand(allocator, &args_it);
-    } else if (std.mem.eql(u8, command, "list")) {
-        try executeListCommand(allocator);
-    } else if (std.mem.eql(u8, command, "summary")) {
-        try executeSummaryCommand(allocator, &args_it);
-    } else {
-        std.debug.print("Unknown command: {s}\n", .{command});
-    }
+    try switch (command) {
+        .start => |args| executeStartCommand(allocator, args.positional.project_id),
+        .add => |args| executeAddCommand(allocator, args.positional.project_id, args.positional.project_name),
+        .list => executeListCommand(allocator),
+        .summary => |args| executeSummaryCommand(allocator, args.positional.month, args.positional.year),
+    };
 }
 
-fn executeSummaryCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIterator) !void {
-    const usage = "Usage: " ++ exe_name ++ " summary <month> <year>\n";
-    const month_str = args_it.next() orelse {
-        std.debug.print(usage, .{});
-        return;
-    };
-    const year_str = args_it.next() orelse {
-        std.debug.print(usage, .{});
-        return;
-    };
-
+fn executeSummaryCommand(allocator: std.mem.Allocator, month_str: []const u8, year_str: []const u8) !void {
     const month_names: []const []const u8 = &.{
         "january",
         "february",
@@ -125,17 +107,7 @@ fn executeSummaryCommand(allocator: std.mem.Allocator, args_it: *std.process.Arg
     }
 }
 
-fn executeAddCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIterator) !void {
-    const usage = "Usage: " ++ exe_name ++ " add <project_it> <project_name>\n";
-    const project_id = args_it.next() orelse {
-        std.debug.print(usage, .{});
-        return;
-    };
-    const project_name = args_it.next() orelse {
-        std.debug.print(usage, .{});
-        return;
-    };
-
+fn executeAddCommand(allocator: std.mem.Allocator, project_id: []const u8, project_name: []const u8) !void {
     try deserialize(allocator, .{ .extra_project = true });
 
     projects[projects.len - 1] = .{
@@ -155,12 +127,7 @@ fn executeListCommand(allocator: std.mem.Allocator) !void {
     }
 }
 
-fn executeStartCommand(allocator: std.mem.Allocator, args_it: *std.process.ArgIterator) !void {
-    const project_id = args_it.next() orelse {
-        std.debug.print("Usage: " ++ exe_name ++ " start <project_id>\n", .{});
-        return;
-    };
-
+fn executeStartCommand(allocator: std.mem.Allocator, project_id: []const u8) !void {
     try deserialize(allocator, .{ .extra_entry = true });
 
     const project = findProject(project_id) orelse {
@@ -411,4 +378,47 @@ const Timestamp = struct {
             .second = try std.fmt.parseInt(u6, it.next().?, 10),
         };
     }
+};
+
+const Command = union(enum) {
+    pub const help =
+        \\Usage trecker <command> [<argument>...]
+        \\
+        \\Commands:
+        \\  start         Starts the trecker.
+        \\  add           Adds a new project.
+        \\  list          Lists all known projects.
+        \\  summary       Prints the work summary for one specific month.
+        \\
+        \\General options:
+        \\  -h, --help    Prints usage info.
+        \\
+    ;
+
+    start: struct {
+        pub const help = "Usage: trecker start <project_id>\n";
+
+        positional: struct {
+            project_id: []const u8,
+        },
+    },
+    add: struct {
+        pub const help = "Usage: trecker add <project_id> <project_name>\n";
+
+        positional: struct {
+            project_id: []const u8,
+            project_name: []const u8,
+        },
+    },
+    list: struct {
+        pub const help = "Usage: trecker list\n";
+    },
+    summary: struct {
+        pub const help = "Usage: trecker summary <month> <year>\n";
+
+        positional: struct {
+            month: []const u8,
+            year: []const u8,
+        },
+    },
 };
