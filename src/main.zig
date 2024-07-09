@@ -2,6 +2,7 @@ const std = @import("std");
 const zli = @import("zli");
 
 const exe_name = "trecker";
+const session_file_name = exe_name ++ "_session.ini";
 
 var projects: []Project = undefined;
 var entries: []Entry = undefined;
@@ -28,9 +29,11 @@ pub fn main() !void {
     }
 
     const should_deserialize = switch (command) {
+        .init => false,
         .start, .add, .list, .summary => true,
     };
     const deserialize_args: DeserializeOptions = switch (command) {
+        .init => undefined,
         .start => .{ .extra_entry = true },
         .add => .{ .extra_project = true },
         .list, .summary => .{},
@@ -47,11 +50,16 @@ pub fn main() !void {
     }
 
     try switch (command) {
+        .init => executeInitCommand(allocator),
         .start => |args| executeStartCommand(allocator, args.positional.project_id),
         .add => |args| executeAddCommand(allocator, args.positional.project_id, args.positional.project_name),
         .list => executeListCommand(),
         .summary => |args| executeSummaryCommand(allocator, args.positional.month, args.positional.year),
     };
+}
+
+fn executeInitCommand(allocator: std.mem.Allocator) !void {
+    try serialize(allocator);
 }
 
 fn executeSummaryCommand(allocator: std.mem.Allocator, month_str: []const u8, year_str: []const u8) !void {
@@ -206,12 +214,12 @@ fn serialize(allocator: std.mem.Allocator) !void {
         try text.writer().print("entry: {s} {s}..{s}\n", .{ entry.project_id, entry.start.toString(), entry.end.toString() });
     }
 
-    try std.fs.cwd().writeFile(.{ .sub_path = exe_name ++ "_session.ini", .data = text.items });
+    try std.fs.cwd().writeFile(.{ .sub_path = session_file_name, .data = text.items });
 }
 
 const DeserializeOptions = struct { extra_project: bool = false, extra_entry: bool = false };
 fn deserialize(allocator: std.mem.Allocator, options: DeserializeOptions) !void {
-    const text = try std.fs.cwd().readFileAlloc(allocator, exe_name ++ "_session.ini", 1024 * 1024 * 1024);
+    const text = try std.fs.cwd().readFileAlloc(allocator, session_file_name, 1024 * 1024 * 1024);
     defer allocator.free(text);
 
     var projects_list = std.ArrayList(Project).init(allocator);
@@ -396,6 +404,7 @@ const Command = union(enum) {
         \\Usage trecker <command> [<argument>...]
         \\
         \\Commands:
+        \\  init          Creates a fresh session file in the working directory.
         \\  start         Starts the trecker.
         \\  add           Adds a new project.
         \\  list          Lists all known projects.
@@ -406,6 +415,9 @@ const Command = union(enum) {
         \\
     ;
 
+    init: struct {
+        pub const help = "Usage: trecker init\n";
+    },
     start: struct {
         pub const help = "Usage: trecker start <project_id>\n";
 
