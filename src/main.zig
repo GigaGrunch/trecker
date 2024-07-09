@@ -27,10 +27,29 @@ pub fn main() !void {
         allocator.free(entries);
     }
 
+    const should_deserialize = switch (command) {
+        .start, .add, .list, .summary => true,
+    };
+    const deserialize_args: DeserializeOptions = switch (command) {
+        .start => .{ .extra_entry = true },
+        .add => .{ .extra_project = true },
+        .list, .summary => .{},
+    };
+
+    if (should_deserialize) {
+        deserialize(allocator, deserialize_args) catch |err| {
+            if (err == error.FileNotFound) {
+                std.debug.print("Session file was not found in the working directory. Run 'trecker init' to create a fresh one.\n", .{});
+                return;
+            }
+            return err;
+        };
+    }
+
     try switch (command) {
         .start => |args| executeStartCommand(allocator, args.positional.project_id),
         .add => |args| executeAddCommand(allocator, args.positional.project_id, args.positional.project_name),
-        .list => executeListCommand(allocator),
+        .list => executeListCommand(),
         .summary => |args| executeSummaryCommand(allocator, args.positional.month, args.positional.year),
     };
 }
@@ -60,8 +79,6 @@ fn executeSummaryCommand(allocator: std.mem.Allocator, month_str: []const u8, ye
     };
 
     const year = try std.fmt.parseInt(u16, year_str, 10);
-
-    try deserialize(allocator, .{});
 
     var project_hours = std.MultiArrayList(struct { p: *Project, h: f64 }){};
     defer project_hours.deinit(allocator);
@@ -108,8 +125,6 @@ fn executeSummaryCommand(allocator: std.mem.Allocator, month_str: []const u8, ye
 }
 
 fn executeAddCommand(allocator: std.mem.Allocator, project_id: []const u8, project_name: []const u8) !void {
-    try deserialize(allocator, .{ .extra_project = true });
-
     projects[projects.len - 1] = .{
         .id = try allocator.dupe(u8, project_id),
         .name = try allocator.dupe(u8, project_name),
@@ -118,9 +133,7 @@ fn executeAddCommand(allocator: std.mem.Allocator, project_id: []const u8, proje
     try serialize(allocator);
 }
 
-fn executeListCommand(allocator: std.mem.Allocator) !void {
-    try deserialize(allocator, .{});
-
+fn executeListCommand() !void {
     std.debug.print("{d} registered projects:\n", .{projects.len});
     for (projects) |project| {
         std.debug.print("{s}: {s}\n", .{ project.id, project.name });
@@ -128,8 +141,6 @@ fn executeListCommand(allocator: std.mem.Allocator) !void {
 }
 
 fn executeStartCommand(allocator: std.mem.Allocator, project_id: []const u8) !void {
-    try deserialize(allocator, .{ .extra_entry = true });
-
     const project = findProject(project_id) orelse {
         std.debug.print("Project with given ID not found: {s}\n", .{project_id});
         std.debug.print("Known IDs:", .{});
@@ -198,11 +209,9 @@ fn serialize(allocator: std.mem.Allocator) !void {
     try std.fs.cwd().writeFile(.{ .sub_path = exe_name ++ "_session.ini", .data = text.items });
 }
 
-fn deserialize(allocator: std.mem.Allocator, options: struct { extra_project: bool = false, extra_entry: bool = false }) !void {
-    const text = std.fs.cwd().readFileAlloc(allocator, exe_name ++ "_session.ini", 1024 * 1024 * 1024) catch |err| {
-        if (err == error.FileNotFound) return;
-        return err;
-    };
+const DeserializeOptions = struct { extra_project: bool = false, extra_entry: bool = false };
+fn deserialize(allocator: std.mem.Allocator, options: DeserializeOptions) !void {
+    const text = try std.fs.cwd().readFileAlloc(allocator, exe_name ++ "_session.ini", 1024 * 1024 * 1024);
     defer allocator.free(text);
 
     var projects_list = std.ArrayList(Project).init(allocator);
@@ -249,6 +258,8 @@ fn deserialize(allocator: std.mem.Allocator, options: struct { extra_project: bo
 
     projects = try allocator.dupe(Project, projects_list.items);
     entries = try allocator.dupe(Entry, entries_list.items);
+
+    return;
 }
 
 fn getTrimmedValue(line: []const u8, comptime name: []const u8) ?[]const u8 {
