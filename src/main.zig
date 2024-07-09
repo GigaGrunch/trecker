@@ -59,7 +59,22 @@ pub fn main() !void {
 }
 
 fn executeInitCommand(allocator: std.mem.Allocator) !void {
-    try serialize(allocator);
+    const file_exists = blk: {
+        std.fs.cwd().access(session_file_name, .{}) catch |err| {
+            if (err == error.FileNotFound) {
+                break :blk false;
+            }
+            return err;
+        };
+        break :blk true;
+    };
+
+    if (file_exists) {
+        std.debug.print("Session file already exists. Delete manually to create a new session.\n", .{});
+    }
+    else {
+        try serialize(allocator);
+    }
 }
 
 fn executeSummaryCommand(allocator: std.mem.Allocator, month_str: []const u8, year_str: []const u8) !void {
