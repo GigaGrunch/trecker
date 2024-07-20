@@ -4,7 +4,7 @@ const zli = @import("zli");
 const exe_name = "trecker";
 const session_file_name = exe_name ++ "_session.ini";
 
-pub fn main() !u8 {
+pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     defer _ = gpa.deinit();
@@ -13,14 +13,14 @@ pub fn main() !u8 {
     defer args_it.deinit();
 
     const command = zli.parse(&args_it, Command);
-    return switch (command) {
-        .init => try executeInitCommand(allocator),
-        .start => |args| try executeStartCommand(allocator, args.positional.project_id),
-        .add => |args| try executeAddCommand(
+    try switch (command) {
+        .init => executeInitCommand(allocator),
+        .start => |args| executeStartCommand(allocator, args.positional.project_id),
+        .add => |args| executeAddCommand(
             allocator, args.positional.project_id, args.positional.project_name
         ),
-        .list => try executeListCommand(allocator),
-        .summary => |args| try executeSummaryCommand(
+        .list => executeListCommand(allocator),
+        .summary => |args| executeSummaryCommand(
             allocator, args.positional.month, args.positional.year
         ),
     };
@@ -31,7 +31,7 @@ fn fatal(comptime fmt: []const u8, args: anytype) noreturn {
     std.process.exit(1);
 }
 
-fn executeInitCommand(allocator: std.mem.Allocator) !u8 {
+fn executeInitCommand(allocator: std.mem.Allocator) !void {
     const file_exists = blk: {
         std.fs.cwd().access(session_file_name, .{}) catch |err| {
             if (err == error.FileNotFound) {
@@ -43,11 +43,10 @@ fn executeInitCommand(allocator: std.mem.Allocator) !u8 {
     };
 
     if (file_exists) {
-        std.debug.print(
-            "Session file '{s}' already exists. Delete manually to create a new session.\n",
-            .{session_file_name},
+        fatal(
+            "Session file '{s}' already exists. Delete manually to create a new session.",
+            .{ session_file_name }
         );
-        return 1;
     }
 
     const store = Store{
@@ -55,10 +54,9 @@ fn executeInitCommand(allocator: std.mem.Allocator) !u8 {
         .entries = &.{},
     };
     try store.serialize(allocator);
-    return 0;
 }
 
-fn executeSummaryCommand(allocator: std.mem.Allocator, month_str: []const u8, year_str: []const u8) !u8 {
+fn executeSummaryCommand(allocator: std.mem.Allocator, month_str: []const u8, year_str: []const u8) !void {
     const month_names: []const []const u8 = &.{
         "january",
         "february",
@@ -78,8 +76,7 @@ fn executeSummaryCommand(allocator: std.mem.Allocator, month_str: []const u8, ye
             break @intCast(number);
         }
     } else {
-        std.debug.print("Unknown month: '{s}'\n", .{month_str});
-        return 1;
+        fatal("Unknown month: '{s}'", .{month_str});
     };
 
     const year = try std.fmt.parseInt(u16, year_str, 10);
@@ -128,10 +125,9 @@ fn executeSummaryCommand(allocator: std.mem.Allocator, month_str: []const u8, ye
     for (project_hours.items(.p), project_hours.items(.h)) |project, hours| {
         std.debug.print("{s}: {d:.2} hours ({d:.0} %)\n", .{ project.name, hours, 100.0 * hours / total_hours });
     }
-    return 0;
 }
 
-fn executeAddCommand(allocator: std.mem.Allocator, project_id: []const u8, project_name: []const u8) !u8 {
+fn executeAddCommand(allocator: std.mem.Allocator, project_id: []const u8, project_name: []const u8) !void {
     var store = try Store.deserialize(allocator, .{ .extra_project = true });
     defer store.deinit(allocator);
     store.projects[store.projects.len - 1] = .{
@@ -139,32 +135,29 @@ fn executeAddCommand(allocator: std.mem.Allocator, project_id: []const u8, proje
         .name = try allocator.dupe(u8, project_name),
     };
     try store.serialize(allocator);
-    return 0;
 }
 
-fn executeListCommand(allocator: std.mem.Allocator) !u8 {
+fn executeListCommand(allocator: std.mem.Allocator) !void {
     var store = try Store.deserialize(allocator, .{});
     defer store.deinit(allocator);
     std.debug.print("{d} registered projects:\n", .{store.projects.len});
     for (store.projects) |project| {
         std.debug.print("{s}: {s}\n", .{ project.id, project.name });
     }
-    return 0;
 }
 
-fn executeStartCommand(allocator: std.mem.Allocator, project_id: []const u8) !u8 {
-
+fn executeStartCommand(allocator: std.mem.Allocator, project_id: []const u8) !void {
     var store = try Store.deserialize(allocator, .{ .extra_entry = true });
     defer store.deinit(allocator);
 
     const project = store.findProject(project_id) orelse {
-        std.debug.print("Project with given ID not found: {s}\n", .{project_id});
-        std.debug.print("Known IDs:", .{});
+        var message = std.ArrayList(u8).init(allocator);
+        try message.writer().print("Project with given ID not found: {s}\n", .{project_id});
+        try message.writer().print("Known IDs:", .{});
         for (store.projects) |project| {
-            std.debug.print(" {s}", .{project.id});
+            try message.writer().print(" {s}", .{project.id});
         }
-        std.debug.print("\n", .{});
-        return 1;
+        fatal("{s}", .{message.items});
     };
 
     var last_entry = &store.entries[store.entries.len - 1];
@@ -204,7 +197,6 @@ fn executeStartCommand(allocator: std.mem.Allocator, project_id: []const u8) !u8
         const one_second = 1_000_000_000;
         std.time.sleep(one_second);
     }
-    return 0;
 }
 
 const Store = struct {
@@ -241,6 +233,7 @@ const Store = struct {
             "{s}: parse error: {s}", .{session_file_name, @errorName(err)},
         );
     }
+
     fn parse(allocator: std.mem.Allocator, options: DeserializeOptions, text: []const u8) !Store {
         var projects: std.ArrayListUnmanaged(Project) = .{};
         defer projects.deinit(allocator);
