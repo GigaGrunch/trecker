@@ -4,8 +4,9 @@
     .minimum_zig_version = "0.13.0",
 
     .dependencies = .{
-        .zli = .{
-            .path = "lib/zli",
+        .flags = .{
+            .url = "https://github.com/n0s4/flags/archive/refs/tags/v0.6.0.tar.gz",
+            .hash = "122059ec2d5696493f89cb2931f53f9cb052795890a8aac992d8e08e0229536ffa02",
         },
     },
 

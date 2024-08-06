@@ -1,5 +1,5 @@
 const std = @import("std");
-const zli = @import("zli");
+const flags = @import("flags");
 
 const exe_name = "trecker";
 const session_file_name = exe_name ++ "_session.ini";
@@ -12,7 +12,7 @@ pub fn main() !void {
     var args_it = try std.process.argsWithAllocator(allocator);
     defer args_it.deinit();
 
-    const command = zli.parse(&args_it, Command);
+    const command = flags.parse(&args_it, Command, .{});
     try switch (command) {
         .init => executeInitCommand(allocator),
         .start => |args| executeStartCommand(allocator, args.positional.project_id),
