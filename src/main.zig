@@ -435,45 +435,30 @@ const Timestamp = struct {
 };
 
 const Command = union(enum) {
-    pub const help =
-        \\Usage trecker <command> [<argument>...]
-        \\
-        \\Commands:
-        \\  init          Creates a fresh session file in the working directory.
-        \\  start         Starts the trecker.
-        \\  add           Adds a new project.
-        \\  list          Lists all known projects.
-        \\  summary       Prints the work summary for one specific month.
-        \\
-        \\General options:
-        \\  -h, --help    Prints usage info.
-        \\
-    ;
+    pub const name = "trecker";
 
-    init: struct {
-        pub const help = "Usage: trecker init\n";
-    },
+    pub const descriptions = .{
+        .init = "Creates a fresh session file in the working directory.",
+        .start = "Starts the trecker.",
+        .add = "Adds a new project.",
+        .list = "Lists all known projects.",
+        .summary = "Prints the work summary for one specific month.",
+    };
+
+    init: struct {},
     start: struct {
-        pub const help = "Usage: trecker start <project_id>\n";
-
         positional: struct {
             project_id: []const u8,
         },
     },
     add: struct {
-        pub const help = "Usage: trecker add <project_id> <project_name>\n";
-
         positional: struct {
             project_id: []const u8,
             project_name: []const u8,
         },
     },
-    list: struct {
-        pub const help = "Usage: trecker list\n";
-    },
+    list: struct {},
     summary: struct {
-        pub const help = "Usage: trecker summary <month> <year>\n";
-
         positional: struct {
             month: []const u8,
             year: []const u8,
