@@ -12,16 +12,16 @@ pub fn main() !void {
     var args_it = try std.process.argsWithAllocator(allocator);
     defer args_it.deinit();
 
-    const command = flags.parse(&args_it, Command, .{});
-    try switch (command) {
+    const args = flags.parse(&args_it, Trecker, .{});
+    try switch (args.command) {
         .init => executeInitCommand(allocator),
-        .start => |args| executeStartCommand(allocator, args.positional.project_id),
-        .add => |args| executeAddCommand(
-            allocator, args.positional.project_id, args.positional.project_name
+        .start => |sub_args| executeStartCommand(allocator, sub_args.positional.project_id),
+        .add => |sub_args| executeAddCommand(
+            allocator, sub_args.positional.project_id, sub_args.positional.project_name
         ),
         .list => executeListCommand(allocator),
-        .summary => |args| executeSummaryCommand(
-            allocator, args.positional.month, args.positional.year
+        .summary => |sub_args| executeSummaryCommand(
+            allocator, sub_args.positional.month, sub_args.positional.year
         ),
     };
 }
@@ -434,34 +434,36 @@ const Timestamp = struct {
     }
 };
 
-const Command = union(enum) {
+const Trecker = struct {
     pub const name = "trecker";
 
-    pub const descriptions = .{
-        .init = "Creates a fresh session file in the working directory.",
-        .start = "Starts the trecker.",
-        .add = "Adds a new project.",
-        .list = "Lists all known projects.",
-        .summary = "Prints the work summary for one specific month.",
-    };
+    command: union(enum) {
+        pub const descriptions = .{
+            .init = "Creates a fresh session file in the working directory.",
+            .start = "Starts the trecker.",
+            .add = "Adds a new project.",
+            .list = "Lists all known projects.",
+            .summary = "Prints the work summary for one specific month.",
+        };
 
-    init: struct {},
-    start: struct {
-        positional: struct {
-            project_id: []const u8,
+        init: struct {},
+        start: struct {
+            positional: struct {
+                project_id: []const u8,
+            },
         },
-    },
-    add: struct {
-        positional: struct {
-            project_id: []const u8,
-            project_name: []const u8,
+        add: struct {
+            positional: struct {
+                project_id: []const u8,
+                project_name: []const u8,
+            },
         },
-    },
-    list: struct {},
-    summary: struct {
-        positional: struct {
-            month: []const u8,
-            year: []const u8,
+        list: struct {},
+        summary: struct {
+            positional: struct {
+                month: []const u8,
+                year: []const u8,
+            },
         },
     },
 };
