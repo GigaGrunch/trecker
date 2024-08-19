@@ -3,11 +3,8 @@ const std = @import("std");
 comptime {
     const zig_version = .{ .major = 0, .minor = 13, .patch = 0 };
     const compatible = @import("builtin").zig_version.order(zig_version) == .eq;
-    // TODO: use comptime-print
-    var buffer: [100]u8 = undefined;
-    var stream = std.io.fixedBufferStream(&buffer);
-    stream.writer().print("Zig version {d}.{d}.{d} is required.", .{ zig_version.major, zig_version.minor, zig_version.patch }) catch @compileError("Failed to print compile error.");
-    if (!compatible) @compileError(&buffer);
+    const message = std.fmt.comptimePrint("Zig version {d}.{d}.{d} is required.", .{ zig_version.major, zig_version.minor, zig_version.patch });
+    if (!compatible) @compileError(message);
 }
 
 pub fn build(b: *std.Build) void {
