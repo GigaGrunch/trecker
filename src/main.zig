@@ -23,12 +23,19 @@ pub fn main() !void {
         .summary => |sub_args| executeSummaryCommand(
             allocator, sub_args.positional.month, sub_args.positional.year
         ),
+        .version => executeVersionCommand(),
     };
 }
 
 fn fatal(comptime fmt: []const u8, args: anytype) noreturn {
     std.debug.print(fmt ++ "\n", args);
     std.process.exit(1);
+}
+
+fn executeVersionCommand() !void {
+    const build_info = @import("build_info");
+    std.debug.print("Git commit hash: {s}\n", .{ build_info.git_commit_hash });
+    std.debug.print("Built with Zig {d}.{d}.{d}\n", .{ build_info.zig_version.major, build_info.zig_version.minor, build_info.zig_version.patch });
 }
 
 fn executeInitCommand(allocator: std.mem.Allocator) !void {
@@ -444,6 +451,7 @@ const Trecker = struct {
             .add = "Adds a new project.",
             .list = "Lists all known projects.",
             .summary = "Prints the work summary for one specific month.",
+            .version = "Prints info about the version of " ++ name,
         };
 
         init: struct {},
@@ -465,5 +473,6 @@ const Trecker = struct {
                 year: []const u8,
             },
         },
+        version: struct {},
     },
 };
