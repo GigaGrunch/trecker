@@ -35,6 +35,7 @@ fn fatal(comptime fmt: []const u8, args: anytype) noreturn {
 fn executeVersionCommand() !void {
     const build_info = @import("build_info");
     std.debug.print("Git commit hash: {s}\n", .{ build_info.git_commit_hash });
+    std.debug.print("Built with Zig {d}.{d}.{d}\n", .{ build_info.zig_version.major, build_info.zig_version.minor, build_info.zig_version.patch });
 }
 
 fn executeInitCommand(allocator: std.mem.Allocator) !void {

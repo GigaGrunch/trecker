@@ -1,8 +1,9 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 comptime {
     const zig_version = .{ .major = 0, .minor = 13, .patch = 0 };
-    const compatible = @import("builtin").zig_version.order(zig_version) == .eq;
+    const compatible = builtin.zig_version.order(zig_version) == .eq;
     const message = std.fmt.comptimePrint("Zig version {d}.{d}.{d} is required.", .{ zig_version.major, zig_version.minor, zig_version.patch });
     if (!compatible) @compileError(message);
 }
@@ -11,9 +12,9 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const git_commit_hash = parseGitCommitHash(b);
     const build_info = b.addOptions();
-    build_info.addOption([]const u8, "git_commit_hash", git_commit_hash);
+    build_info.addOption([]const u8, "git_commit_hash", parseGitCommitHash(b));
+    build_info.addOption(std.SemanticVersion, "zig_version", builtin.zig_version);
 
     const exe = b.addExecutable(.{
         .name = "trecker",
