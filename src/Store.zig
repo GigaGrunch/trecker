@@ -3,6 +3,9 @@ const util = @import("util.zig");
 const Timestamp = @import("Timestamp.zig");
 const Store = @This();
 
+const file_format_version = 1;
+const file_format_version_str = std.fmt.comptimePrint("{d}", .{file_format_version});
+
 projects: []Project,
 entries: []Entry,
 
@@ -26,7 +29,7 @@ pub fn serialize(self: Store, allocator: std.mem.Allocator) !void {
     var text = std.ArrayList(u8).init(allocator);
     defer text.deinit();
 
-    try text.writer().print("version: 1\n", .{});
+    try text.writer().print("version: {d}\n", .{file_format_version});
 
     try text.writer().print("\n", .{});
     for (self.projects) |project| {
@@ -72,7 +75,7 @@ fn parse(allocator: std.mem.Allocator, options: DeserializeOptions, text: []cons
     const version_line = lines_it.first();
     const version = getTrimmedValue(version_line, "version");
     if (version == null) return error.MissingVersion;
-    if (!std.mem.eql(u8, version.?, "1")) return error.UnsupportedVersion;
+    if (!std.mem.eql(u8, version.?, file_format_version_str)) return error.UnsupportedVersion;
 
     while (lines_it.next()) |line| {
         if (getTrimmedValue(line, "project")) |project_str| {
