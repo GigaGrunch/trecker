@@ -6,22 +6,7 @@ const Store = @This();
 projects: []Project,
 entries: []Entry,
 
-pub fn deinit(self: *Store, allocator: std.mem.Allocator) void {
-    for (self.projects) |project| {
-        project.deinit(allocator);
-    }
-    allocator.free(self.projects);
-    for (self.entries) |entry| {
-        entry.deinit(allocator);
-    }
-    allocator.free(self.entries);
-    self.* = undefined;
-}
-
-const DeserializeOptions = struct {
-    extra_project: bool = false,
-    extra_entry: bool = false,
-};
+const DeserializeOptions = struct { extra_project: bool = false, extra_entry: bool = false };
 pub fn deserialize(allocator: std.mem.Allocator, options: DeserializeOptions) !Store {
     const text = std.fs.cwd().readFileAlloc(allocator, util.session_file_name, 1024 * 1024 * 1024) catch |err| switch (err) {
         error.FileNotFound => util.fatal(
@@ -35,6 +20,46 @@ pub fn deserialize(allocator: std.mem.Allocator, options: DeserializeOptions) !S
         "{s}: parse error: {s}",
         .{ util.session_file_name, @errorName(err) },
     );
+}
+
+pub fn serialize(self: Store, allocator: std.mem.Allocator) !void {
+    var text = std.ArrayList(u8).init(allocator);
+    defer text.deinit();
+
+    try text.writer().print("version: 1\n", .{});
+
+    try text.writer().print("\n", .{});
+    for (self.projects) |project| {
+        try text.writer().print("project: {s} '{s}'\n", .{ project.id, project.name });
+    }
+
+    try text.writer().print("\n", .{});
+    for (self.entries) |entry| {
+        try text.writer().print("entry: {s} {s}..{s}\n", .{ entry.project_id, entry.start.toString(), entry.end.toString() });
+    }
+
+    try std.fs.cwd().writeFile(.{ .sub_path = util.session_file_name, .data = text.items });
+}
+
+pub fn deinit(self: *Store, allocator: std.mem.Allocator) void {
+    for (self.projects) |project| {
+        project.deinit(allocator);
+    }
+    allocator.free(self.projects);
+    for (self.entries) |entry| {
+        entry.deinit(allocator);
+    }
+    allocator.free(self.entries);
+    self.* = undefined;
+}
+
+pub fn findProject(self: Store, id: []const u8) ?*Project {
+    for (self.projects) |*project| {
+        if (std.mem.eql(u8, id, project.id)) {
+            return project;
+        }
+    }
+    return null;
 }
 
 fn parse(allocator: std.mem.Allocator, options: DeserializeOptions, text: []const u8) !Store {
@@ -94,34 +119,6 @@ fn getTrimmedValue(line: []const u8, comptime name: []const u8) ?[]const u8 {
         return std.mem.trim(u8, raw, "\n\r\t ");
     }
     return null;
-}
-
-pub fn findProject(self: Store, id: []const u8) ?*Project {
-    for (self.projects) |*project| {
-        if (std.mem.eql(u8, id, project.id)) {
-            return project;
-        }
-    }
-    return null;
-}
-
-pub fn serialize(self: Store, allocator: std.mem.Allocator) !void {
-    var text = std.ArrayList(u8).init(allocator);
-    defer text.deinit();
-
-    try text.writer().print("version: 1\n", .{});
-
-    try text.writer().print("\n", .{});
-    for (self.projects) |project| {
-        try text.writer().print("project: {s} '{s}'\n", .{ project.id, project.name });
-    }
-
-    try text.writer().print("\n", .{});
-    for (self.entries) |entry| {
-        try text.writer().print("entry: {s} {s}..{s}\n", .{ entry.project_id, entry.start.toString(), entry.end.toString() });
-    }
-
-    try std.fs.cwd().writeFile(.{ .sub_path = util.session_file_name, .data = text.items });
 }
 
 pub const Project = struct {

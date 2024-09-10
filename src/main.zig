@@ -1,10 +1,10 @@
 const std = @import("std");
 const flags = @import("flags");
+const commands = @import("commands.zig");
+const util = @import("util.zig");
 const Store = @import("Store.zig");
 const Timestamp = @import("Timestamp.zig");
 const Args = @import("Args.zig");
-const commands = @import("commands.zig");
-const util = @import("util.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};

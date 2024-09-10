@@ -1,4 +1,6 @@
-pub const name = "trecker";
+const util = @import("util.zig");
+
+pub const name = util.exe_name;
 
 command: union(enum) {
     pub const descriptions = .{
