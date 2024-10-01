@@ -98,7 +98,9 @@ pub fn summary(allocator: std.mem.Allocator, month_str: []const u8, year_str: []
 
     std.debug.print("Total: {d:.2} hours ({d:.2} hours per day)\n", .{ total_hours, avg_hours_per_day });
     for (project_hours.items(.p), project_hours.items(.h)) |project, hours| {
-        std.debug.print("{s}: {d:.2} hours ({d:.0} %)\n", .{ project.name, hours, 100.0 * hours / total_hours });
+        if (hours > 0) {
+            std.debug.print("{s}: {d:.2} hours ({d:.0} %)\n", .{ project.name, hours, 100.0 * hours / total_hours });
+        }
     }
 }
 
