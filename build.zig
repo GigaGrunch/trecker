@@ -22,6 +22,7 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
+    exe.linkLibC();
     exe.root_module.addOptions("build_info", build_info);
 
     const flags = b.dependency("flags", .{});

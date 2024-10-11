@@ -7,9 +7,12 @@ const Timestamp = @import("Timestamp.zig");
 const Args = @import("Args.zig");
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
-    defer _ = gpa.deinit();
+    // TODO: Windows 11 does not allow GPA when building for release.
+    // TODO: When this is fixed, remove linkLibC from build.zig as well.
+    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    // defer _ = gpa.deinit();
+    // const allocator = gpa.allocator();
+    const allocator = std.heap.c_allocator;
 
     var args_it = try std.process.argsWithAllocator(allocator);
     defer args_it.deinit();
