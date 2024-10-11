@@ -16,23 +16,18 @@ pub fn build(b: *std.Build) !void {
     build_info.addOption([]const u8, "git_commit_hash", parseGitCommitHash(b));
     build_info.addOption(std.SemanticVersion, "zig_version", builtin.zig_version);
 
-    const build_options = b.addOptions();
-    const selected_allocator = b.option([]const u8, "allocator", "{gpa,c}") orelse "gpa";
-    build_options.addOption([]const u8, "allocator", selected_allocator);
-
     const exe = b.addExecutable(.{
         .name = "trecker",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    
-    if (std.mem.eql(u8, selected_allocator, "c")) {
+
+    if (exe.root_module.optimize != .Debug) {
         exe.linkLibC();
     }
 
     exe.root_module.addOptions("build_info", build_info);
-    exe.root_module.addOptions("build_options", build_options);
 
     const flags = b.dependency("flags", .{});
     exe.root_module.addImport("flags", flags.module("flags"));

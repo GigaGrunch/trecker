@@ -6,10 +6,12 @@ const Store = @import("Store.zig");
 const Timestamp = @import("Timestamp.zig");
 const Args = @import("Args.zig");
 
+const use_gpa = @import("builtin").mode == .Debug;
+
 pub fn main() !void {
-    var gpa = if (use_gpa) std.heap.GeneralPurposeAllocator(.{}){} else @as(std.heap.GeneralPurposeAllocator(.{}), undefined);
-    defer _ = if (use_gpa) gpa.deinit() else undefined;
-    const allocator = if (use_gpa) gpa.allocator() else std.heap.c_allocator;
+    var alloc_wrapper = getAllocWrapper();
+    defer deinitAllocWrapper(&alloc_wrapper);
+    const allocator = getAllocator(&alloc_wrapper);
 
     var args_it = try std.process.argsWithAllocator(allocator);
     defer args_it.deinit();
@@ -25,13 +27,18 @@ pub fn main() !void {
     };
 }
 
-const allocator_option = @import("build_options").allocator;
-const use_gpa = blk: {
-    if (std.mem.eql(u8, allocator_option, "gpa")) {
-        break :blk true;
+const AllocWrapper = if (use_gpa) std.heap.GeneralPurposeAllocator(.{}) else void;
+
+fn getAllocWrapper() AllocWrapper {
+    return if (use_gpa) .{} else {};
+}
+
+fn deinitAllocWrapper(alloc_wrapper: *AllocWrapper) void {
+    if (use_gpa) {
+        _ = alloc_wrapper.deinit();
     }
-    if (std.mem.eql(u8, allocator_option, "c")) {
-        break :blk false;
-    }
-    unreachable;
-};
+}
+
+fn getAllocator(alloc_wrapper: *AllocWrapper) std.mem.Allocator {
+    return if (use_gpa) alloc_wrapper.allocator() else std.heap.c_allocator;
+}
