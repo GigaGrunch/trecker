@@ -3,6 +3,9 @@ const util = @import("util.zig");
 const Timestamp = @import("Timestamp.zig");
 const Store = @This();
 
+const file_format_version = 2;
+const file_format_version_str = std.fmt.comptimePrint("{d}", .{file_format_version});
+
 projects: []Project,
 entries: []Entry,
 
@@ -26,7 +29,7 @@ pub fn serialize(self: Store, allocator: std.mem.Allocator) !void {
     var text = std.ArrayList(u8).init(allocator);
     defer text.deinit();
 
-    try text.writer().print("version: 1\n", .{});
+    try text.writer().print("version: {d}\n", .{file_format_version});
 
     try text.writer().print("\n", .{});
     for (self.projects) |project| {
@@ -35,7 +38,9 @@ pub fn serialize(self: Store, allocator: std.mem.Allocator) !void {
 
     try text.writer().print("\n", .{});
     for (self.entries) |entry| {
-        try text.writer().print("entry: {s} {s}..{s}\n", .{ entry.project_id, entry.start.toString(), entry.end.toString() });
+        const start_str = try entry.start.toString();
+        const end_str = try entry.end.toString();
+        try text.writer().print("entry: {s} {s}..{s}\n", .{ entry.project_id, start_str, end_str });
     }
 
     try std.fs.cwd().writeFile(.{ .sub_path = util.session_file_name, .data = text.items });
@@ -72,7 +77,7 @@ fn parse(allocator: std.mem.Allocator, options: DeserializeOptions, text: []cons
     const version_line = lines_it.first();
     const version = getTrimmedValue(version_line, "version");
     if (version == null) return error.MissingVersion;
-    if (!std.mem.eql(u8, version.?, "1")) return error.UnsupportedVersion;
+    if (!std.mem.eql(u8, version.?, file_format_version_str)) return error.UnsupportedVersion;
 
     while (lines_it.next()) |line| {
         if (getTrimmedValue(line, "project")) |project_str| {
@@ -141,8 +146,8 @@ pub const Entry = struct {
     }
 
     pub fn getTotalSeconds(entry: Entry) i64 {
-        const start = entry.start;
-        const end = entry.end;
+        const start = entry.start.time;
+        const end = entry.end.time;
         std.debug.assert(start.year == end.year);
         std.debug.assert(start.month == end.month);
         std.debug.assert(start.day == end.day);

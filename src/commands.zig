@@ -46,9 +46,9 @@ pub fn summary(allocator: std.mem.Allocator, month_str: []const u8, year_str: []
         "november",
         "december",
     };
-    const month: u4 = for (month_names, 1..) |month_name, number| {
+    const month: Timestamp.Month = for (month_names, 1..) |month_name, number| {
         if (std.mem.eql(u8, month_str, month_name)) {
-            break @intCast(number);
+            break @enumFromInt(number);
         }
     } else {
         util.fatal("Unknown month: '{s}'", .{month_str});
@@ -70,11 +70,11 @@ pub fn summary(allocator: std.mem.Allocator, month_str: []const u8, year_str: []
     var work_days_len: usize = 0;
 
     for (store.entries) |entry| {
-        if (entry.start.month != month) continue;
-        if (entry.start.year != year) continue;
+        if (entry.start.time.month != month) continue;
+        if (entry.start.time.year != year) continue;
 
-        if (std.mem.indexOfScalar(Timestamp.Day, work_days[0..work_days_len], entry.start.day) == null) {
-            work_days[work_days_len] = entry.start.day;
+        if (std.mem.indexOfScalar(Timestamp.Day, work_days[0..work_days_len], entry.start.time.day) == null) {
+            work_days[work_days_len] = entry.start.time.day;
             work_days_len += 1;
         }
 
@@ -143,15 +143,15 @@ pub fn start(allocator: std.mem.Allocator, project_id: []const u8) !void {
     var raw_end = std.time.timestamp();
     last_entry.* = Store.Entry{
         .project_id = project.id,
-        .start = Timestamp.now(),
-        .end = Timestamp.now(),
+        .start = try Timestamp.now(allocator),
+        .end = try Timestamp.now(allocator),
     };
 
     var initial_total_today: i64 = 0;
     for (store.entries) |other| {
-        if (last_entry.start.year != other.start.year) continue;
-        if (last_entry.start.month != other.start.month) continue;
-        if (last_entry.start.day != other.start.day) continue;
+        if (last_entry.start.time.year != other.start.time.year) continue;
+        if (last_entry.start.time.month != other.start.time.month) continue;
+        if (last_entry.start.time.day != other.start.time.day) continue;
         initial_total_today += other.getTotalSeconds();
     }
 
@@ -167,7 +167,7 @@ pub fn start(allocator: std.mem.Allocator, project_id: []const u8) !void {
         const entry_minutes = getMinutes(raw_end - raw_start);
         if (entry_minutes != minutes) {
             raw_end = raw_now;
-            last_entry.end = Timestamp.now();
+            last_entry.end = try Timestamp.now(allocator);
             try store.serialize(allocator);
         }
 
