@@ -3,7 +3,7 @@ const util = @import("util.zig");
 const Timestamp = @import("Timestamp.zig");
 const Store = @This();
 
-const file_format_version = 1;
+const file_format_version = 2;
 const file_format_version_str = std.fmt.comptimePrint("{d}", .{file_format_version});
 
 projects: []Project,
