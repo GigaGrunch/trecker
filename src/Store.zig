@@ -38,7 +38,9 @@ pub fn serialize(self: Store, allocator: std.mem.Allocator) !void {
 
     try text.writer().print("\n", .{});
     for (self.entries) |entry| {
-        try text.writer().print("entry: {s} {s}..{s}\n", .{ entry.project_id, entry.start.toString(), entry.end.toString() });
+        const start_str = try entry.start.toString();
+        const end_str = try entry.end.toString();
+        try text.writer().print("entry: {s} {s}..{s}\n", .{ entry.project_id, start_str, end_str });
     }
 
     try std.fs.cwd().writeFile(.{ .sub_path = util.session_file_name, .data = text.items });
@@ -144,8 +146,8 @@ pub const Entry = struct {
     }
 
     pub fn getTotalSeconds(entry: Entry) i64 {
-        const start = entry.start;
-        const end = entry.end;
+        const start = entry.start.time;
+        const end = entry.end.time;
         std.debug.assert(start.year == end.year);
         std.debug.assert(start.month == end.month);
         std.debug.assert(start.day == end.day);
