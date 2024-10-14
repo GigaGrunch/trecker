@@ -1,6 +1,5 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const allocator_compatibility = @import("src/allocator_compatibility.zig");
 
 comptime {
     const zig_version = .{ .major = 0, .minor = 13, .patch = 0 };
