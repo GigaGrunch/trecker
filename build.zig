@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const allocator_compatibility = @import("src/allocator_compatibility.zig");
 
 comptime {
     const zig_version = .{ .major = 0, .minor = 13, .patch = 0 };
@@ -12,9 +13,17 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const allocator_type: enum { gpa, c } = switch (optimize) {
+        .Debug => .gpa,
+        .ReleaseSafe => .c,
+        .ReleaseFast => .c,
+        .ReleaseSmall => .c,
+    };
+
     const build_info = b.addOptions();
     build_info.addOption([]const u8, "git_commit_hash", parseGitCommitHash(b));
     build_info.addOption(std.SemanticVersion, "zig_version", builtin.zig_version);
+    build_info.addOption(@TypeOf(allocator_type), "allocator_type", allocator_type);
 
     const exe = b.addExecutable(.{
         .name = "trecker",
@@ -23,8 +32,9 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    if (exe.root_module.optimize != .Debug) {
-        exe.linkLibC();
+    switch (allocator_type) {
+        .gpa => {},
+        .c => exe.linkLibC(),
     }
 
     exe.root_module.addOptions("build_info", build_info);

@@ -3,8 +3,6 @@ const flags = @import("flags");
 const commands = @import("commands.zig");
 const Args = @import("Args.zig");
 
-const use_gpa = @import("builtin").mode == .Debug;
-
 pub fn main() !void {
     var alloc_wrapper = getAllocWrapper();
     defer deinitAllocWrapper(&alloc_wrapper);
@@ -24,18 +22,30 @@ pub fn main() !void {
     };
 }
 
-const AllocWrapper = if (use_gpa) std.heap.GeneralPurposeAllocator(.{}) else void;
+pub const allocator_type = @import("build_info").allocator_type;
 
-fn getAllocWrapper() AllocWrapper {
-    return if (use_gpa) .{} else {};
+const AllocWrapper = switch (allocator_type) {
+    .gpa => std.heap.GeneralPurposeAllocator(.{}),
+    .c => void,
+};
+
+pub fn getAllocWrapper() AllocWrapper {
+    return switch (allocator_type) {
+        .gpa => .{},
+        .c => {},
+    };
 }
 
-fn deinitAllocWrapper(alloc_wrapper: *AllocWrapper) void {
-    if (use_gpa) {
-        _ = alloc_wrapper.deinit();
+pub fn deinitAllocWrapper(alloc_wrapper: *AllocWrapper) void {
+    switch (allocator_type) {
+        .gpa => _ = alloc_wrapper.deinit(),
+        .c => {},
     }
 }
 
-fn getAllocator(alloc_wrapper: *AllocWrapper) std.mem.Allocator {
-    return if (use_gpa) alloc_wrapper.allocator() else std.heap.c_allocator;
+pub fn getAllocator(alloc_wrapper: *AllocWrapper) std.mem.Allocator {
+    return switch (allocator_type) {
+        .gpa => alloc_wrapper.allocator(),
+        .c => std.heap.c_allocator,
+    };
 }
