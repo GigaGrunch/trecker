@@ -162,7 +162,11 @@ pub fn start(allocator: std.mem.Allocator, project_id: []const u8) !void {
         const minutes = getMinutes(elapsed);
         const seconds = getSeconds(elapsed);
         const total_today = elapsed + initial_total_today;
-        std.debug.print("\r{s}: {d}:{d:0>2}:{d:0>2} (Today: {d}:{d:0>2}:{d:0>2})          \r", .{ project.name, hours, minutes, seconds, getHours(total_today), getMinutes(total_today), getSeconds(total_today) });
+        const total_hours = getHours(total_today);
+        const total_minutes = getMinutes(total_today);
+        const total_seconds = getSeconds(total_today);
+        std.debug.print("\r{s}: {d}:{d:0>2}:{d:0>2} (Today: {d}:{d:0>2}:{d:0>2})          \r", .{ project.name, hours, minutes, seconds, total_hours, total_minutes, total_seconds });
+        std.debug.print("\x1b]0;{s} {s} {d}:{d:0>2}:{d:0>2}\x07", .{util.exe_name, project.name, total_hours, total_minutes, total_seconds});
 
         const entry_minutes = getMinutes(raw_end - raw_start);
         if (entry_minutes != minutes) {
