@@ -154,6 +154,13 @@ pub fn start(allocator: std.mem.Allocator, project_id: []const u8) !void {
         if (last_entry.start.time.day != other.start.time.day) continue;
         initial_total_today += other.getTotalSeconds();
     }
+    
+    const redraw_lines = 2;
+    std.debug.print("--- Trecker --- \n", .{});
+    std.debug.print("Project: {s} ({s})\n", .{project.name, project.id});
+    for (1..redraw_lines) |_| {
+        std.debug.print("\n", .{});
+    }
 
     while (true) {
         const raw_now = std.time.timestamp();
@@ -165,7 +172,15 @@ pub fn start(allocator: std.mem.Allocator, project_id: []const u8) !void {
         const total_hours = getHours(total_today);
         const total_minutes = getMinutes(total_today);
         const total_seconds = getSeconds(total_today);
-        std.debug.print("\r{s}: {d}:{d:0>2}:{d:0>2} (Today: {d}:{d:0>2}:{d:0>2})          \r", .{ project.name, hours, minutes, seconds, total_hours, total_minutes, total_seconds });
+        
+        const go_to_first_line = std.fmt.comptimePrint("\x1b[{d}A", .{redraw_lines - 1});
+        const clear_line = "\x1b[2K\r";
+        std.debug.print("{s}", .{go_to_first_line});
+        std.debug.print("{s}", .{clear_line});
+        std.debug.print("Current entry: {d}:{d:0>2}:{d:0>2}\n", .{hours, minutes, seconds});
+        std.debug.print("{s}", .{clear_line});
+        std.debug.print("Total today: {d}:{d:0>2}:{d:0>2}", .{total_hours, total_minutes, total_seconds});
+        
         std.debug.print("\x1b]0;{s} {s} {d}:{d:0>2}:{d:0>2}\x07", .{util.exe_name, project.id, total_hours, total_minutes, total_seconds});
 
         const entry_minutes = getMinutes(raw_end - raw_start);
