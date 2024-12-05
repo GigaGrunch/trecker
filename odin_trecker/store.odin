@@ -7,6 +7,7 @@ import "core:os"
 
 store_version :: 2
 store_version_str :: "2"
+time_format :: "yyyy-MM-ddThh:mm:ss"
 
 Store :: struct {
     projects: [dynamic]Project,
@@ -46,23 +47,23 @@ serialize_store :: proc(store: Store) -> []u8 {
         strings.write_string(&builder, "entry: ")
         strings.write_string(&builder, entry.project_id)
         strings.write_string(&builder, " ")
-        // TODO: timezone
         start_str, start_ok := time.time_to_rfc3339(entry.start)
         end_str, end_ok := time.time_to_rfc3339(entry.end)
         if !start_ok || !end_ok {
             fmt.printfln("Failed to serialize time stamps for entry: %v", entry)
             os.exit(1)
         }
-        strings.write_string(&builder, start_str)
+        
+        strings.write_string(&builder, start_str[:len(time_format)])
         strings.write_string(&builder, "..")
-        strings.write_string(&builder, end_str)
+        strings.write_string(&builder, end_str[:len(time_format)])
         strings.write_string(&builder, "\n")
     }
     
     return builder.buf[:]
 }
 
-deserialize_store :: proc(serialized: []u8) -> (Store, bool) {
+deserialize_store :: proc(serialized: []u8) -> (res: Store, ok: bool) {
     lines_it := tokenize(serialized, "\r\n")
     
     result: Store
@@ -115,8 +116,8 @@ deserialize_store :: proc(serialized: []u8) -> (Store, bool) {
                 return {}, false
             }
             
-            start, _ := time.rfc3339_to_time_utc(range_split[0])
-            end, _ := time.rfc3339_to_time_utc(range_split[1])
+            start := parse_time(range_split[0]) or_return
+            end := parse_time(range_split[1]) or_return
             
             append(&result.entries, Entry {
                 project_id = project_id,
@@ -137,6 +138,28 @@ deserialize_store :: proc(serialized: []u8) -> (Store, bool) {
     
     if strings.compare(version_value, store_version_str) != 0 {
         fmt.printfln("Serialized store version is '%v', but only '%v' is supported.", version_value, store_version_str)
+        return {}, false
+    }
+    
+    return result, true
+}
+
+parse_time :: proc(str: string) -> (res: time.Time, ok: bool) {
+    if len(str) != len(time_format) {
+        fmt.printfln("Time string '%v' (len=%v) has invalid format. '%v' (len=%v) is expected", str, len(str), time_format, len(time_format))
+        return {}, false
+    }
+    
+    suffix :: "+00:00"
+    fixed: [len(time_format) + len(suffix)]u8
+    
+    copy(fixed[:len(time_format)], str)
+    copy(fixed[len(time_format):], suffix)
+
+    result, _, _ := time.rfc3339_to_time_and_offset(transmute(string)fixed[:])
+    
+    if result == {} {
+        fmt.printfln("Failed to parse time from '%v'.", str)
         return {}, false
     }
     
