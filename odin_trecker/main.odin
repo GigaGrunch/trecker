@@ -98,6 +98,7 @@ command_start :: proc(args: StartArgs) {
     
         clear_line :: "\x1b[2K\r";
         fmt.printf("%v%v %v (%v)\r", clear_line, project.name, duration_str, today_duration_str)
+        fmt.printf("\x1b]0;trecker %v %v\x07", project.id, today_duration_str);
         
         full_minute := int(time.duration_minutes(duration))
         if full_minute > last_serialization_minute {
