@@ -2,6 +2,7 @@ package trecker
 
 import "core:os"
 import "core:fmt"
+import "core:strings"
 
 main :: proc() {
     args, args_ok := parse_args(os.args[1:])
@@ -27,8 +28,6 @@ command_init :: proc() {
 }
 
 command_add :: proc(args: AddArgs) {
-    // TODO: check for duplicates
-
     serialized, file_ok := os.read_entire_file(session_file_path)
     if !file_ok {
         fmt.printfln("Failed to read file at '%v'", session_file_path)
@@ -36,6 +35,13 @@ command_add :: proc(args: AddArgs) {
     }
     store, store_ok := deserialize_store(serialized)
     if !store_ok do os.exit(1)
+    
+    for other_project in store.projects {
+        if strings.compare(other_project.id, args.project_id) == 0 {
+            fmt.printfln("Project with id '%v' is already defined.", args.project_id)
+            os.exit(1)
+        }
+    }
     
     project := Project {
         name = args.project_name,
