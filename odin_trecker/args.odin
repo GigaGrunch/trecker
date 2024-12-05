@@ -7,15 +7,21 @@ Args :: struct {
     type: enum {
         init,
         add,
+        start,
     },
     
     inner: union {
         AddArgs,
+        StartArgs,
     }
 }
 
 AddArgs :: struct {
     project_name: string,
+    project_id: string,
+}
+
+StartArgs :: struct {
     project_id: string,
 }
 
@@ -46,6 +52,17 @@ parse_args :: proc(raw_args: []string) -> (Args, bool) {
                 project_id = raw_args[1],
                 project_name = raw_args[2],
             },
+        }, true
+    }
+    if strings.compare(command_str, "start") == 0 {
+        if len(raw_args) < 2 {
+            fmt.println("Missing argument: project_id")
+            return {}, false
+        }
+        
+        return Args {
+            type = .start,
+            inner = StartArgs { project_id = raw_args[1] }
         }, true
     }
 

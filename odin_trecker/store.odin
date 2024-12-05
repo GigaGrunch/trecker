@@ -2,6 +2,7 @@ package trecker
 
 import "core:strings"
 import "core:fmt"
+import "core:time"
 
 store_version :: 2
 store_version_str :: "2"
@@ -13,6 +14,11 @@ Store :: struct {
 Project :: struct {
     name: string,
     id: string,
+}
+
+Entry :: struct {
+    start: time.Time,
+    end: time.Time,
 }
 
 serialize_store :: proc(store: Store) -> []u8 {
