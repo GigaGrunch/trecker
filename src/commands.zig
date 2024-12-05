@@ -37,7 +37,7 @@ const Summary = struct {
     avg_hours_per_day: f64 = 0,
 };
 
-pub fn csv_summary(allocator: std.mem.Allocator, month_str: []const u8, year_str: []const u8) !void {
+pub fn csv_summary(allocator: std.mem.Allocator, month_str: []const u8, year_str: []const u8, user_name: []const u8) !void {
     var summary = Summary{};
     defer summary.project_hours.deinit(allocator);
 
@@ -48,7 +48,7 @@ pub fn csv_summary(allocator: std.mem.Allocator, month_str: []const u8, year_str
 
     for (summary.project_hours.items(.p), summary.project_hours.items(.h)) |project, hours| {
         if (hours > 0) {
-            std.debug.print("{s},{d:.0}%\n", .{ project.name, 100.0 * hours / summary.total_hours });
+            std.debug.print("{s},{s},{d:.0}%\n", .{ user_name, project.name, 100.0 * hours / summary.total_hours });
         }
     }
 }

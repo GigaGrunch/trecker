@@ -35,6 +35,7 @@ command: union(enum) {
         positional: struct {
             month: []const u8,
             year: []const u8,
+            user_name: []const u8,
         },
     },
     version: struct {},
