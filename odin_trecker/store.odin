@@ -88,14 +88,13 @@ deserialize_store :: proc(serialized: []u8) -> (res: Store, ok: bool) {
             version_value = value
         }
         else if strings.compare(key, project_key) == 0 {
-            project_it := tokenize(value, " ")
-            project_id, id_ok := next_token(&project_it)
-            wrapped_project_name, name_ok := next_token(&project_it)
-            if !id_ok || !name_ok {
-                fmt.printfln("Failed to parse project id and name from line %v: '%v'.", line_index + 1, line)
+            project_split := strings.split_n(value, " ", 2)
+            if len(project_split) != 2 {
+                fmt.printfln("Failed to parse project id and name from linee %v: '%v'.", line_index + 1, line)
                 return {}, false
             }
-            project_name := strings.trim(wrapped_project_name, "'")
+            project_id := project_split[0]
+            project_name := strings.trim(project_split[1], "'")
             append(&result.projects, Project {
                 name = project_name,
                 id = project_id,
