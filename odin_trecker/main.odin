@@ -75,7 +75,7 @@ command_start :: proc(args: StartArgs) {
     })
     entry := &store.entries[entry_index]
     
-    last_serialization_minute := -1
+    last_serialization_minute := 0
     duration_buf: [len("00:00:00")]u8
     
     for {
