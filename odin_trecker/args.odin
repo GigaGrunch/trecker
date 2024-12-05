@@ -6,7 +6,17 @@ import "core:fmt"
 Args :: struct {
     type: enum {
         init,
+        add,
     },
+    
+    inner: union {
+        AddArgs,
+    }
+}
+
+AddArgs :: struct {
+    project_name: string,
+    project_id: string,
 }
 
 parse_args :: proc(raw_args: []string) -> (Args, bool) {
@@ -19,6 +29,24 @@ parse_args :: proc(raw_args: []string) -> (Args, bool) {
 
     if strings.compare(command_str, "init") == 0 {
         return Args { type = .init }, true
+    }
+    if strings.compare(command_str, "add") == 0 {
+        if len(raw_args) < 2 {
+            fmt.println("Missing argument: project_id")
+            return {}, false
+        }
+        if len(raw_args) < 3 {
+            fmt.println("Missing argument: project_name")
+            return {}, false
+        }
+        
+        return Args {
+            type = .add,
+            inner = AddArgs {
+                project_id = raw_args[1],
+                project_name = raw_args[2],
+            },
+        }, true
     }
 
     fmt.printfln("Unknown command: '%v'.", command_str)
