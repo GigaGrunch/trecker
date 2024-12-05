@@ -67,18 +67,32 @@ command_start :: proc(args: StartArgs) {
         os.exit(1)
     }
     
-    entry := Entry { start = time.now() }
-    stopwatch: time.Stopwatch
-    time.stopwatch_start(&stopwatch)
+    entry_index := len(store.entries)
+    append(&store.entries, Entry {
+        project_id = args.project_id,
+        start = time.now(),
+        end = time.now(),
+    })
+    entry := &store.entries[entry_index]
     
+    last_serialization_minute := -1
     duration_buf: [len("00:00:00")]u8
     
     for {
-        duration := time.stopwatch_duration(stopwatch)
+        defer free_all(context.temp_allocator)
+    
+        duration := time.since(entry.start)
         duration_str := time.duration_to_string_hms(duration, duration_buf[:])
     
         clear_line :: "\x1b[2K\r";
-        fmt.printf("%v%v", clear_line, duration_str)
+        fmt.printf("%v%v\r", clear_line, duration_str)
+        
+        full_minute := int(time.duration_minutes(duration))
+        if full_minute > last_serialization_minute {
+            entry.end = time.now()
+            last_serialization_minute = full_minute
+            write_store_file(store)
+        }
         
         time.sleep(1 * time.Second)
     }

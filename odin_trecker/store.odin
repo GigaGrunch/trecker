@@ -3,12 +3,14 @@ package trecker
 import "core:strings"
 import "core:fmt"
 import "core:time"
+import "core:os"
 
 store_version :: 2
 store_version_str :: "2"
 
 Store :: struct {
     projects: [dynamic]Project,
+    entries: [dynamic]Entry,
 }
 
 Project :: struct {
@@ -17,14 +19,17 @@ Project :: struct {
 }
 
 Entry :: struct {
+    project_id: string,
     start: time.Time,
     end: time.Time,
 }
 
 serialize_store :: proc(store: Store) -> []u8 {
+    context.allocator = context.temp_allocator
+
     builder := strings.builder_make()
     
-    strings.write_string(&builder, "version: ")
+    strings.write_string(&builder, "version: ") // TODO: these are the same consts as in deserialize
     strings.write_int(&builder, store_version)
     strings.write_string(&builder, "\n\n")
     
@@ -34,6 +39,24 @@ serialize_store :: proc(store: Store) -> []u8 {
         strings.write_string(&builder, " '")
         strings.write_string(&builder, project.name)
         strings.write_string(&builder, "'\n")
+    }
+    strings.write_string(&builder, "\n")
+    
+    for entry in store.entries {
+        strings.write_string(&builder, "entry: ")
+        strings.write_string(&builder, entry.project_id)
+        strings.write_string(&builder, " ")
+        // TODO: timezone
+        start_str, start_ok := time.time_to_rfc3339(entry.start)
+        end_str, end_ok := time.time_to_rfc3339(entry.end)
+        if !start_ok || !end_ok {
+            fmt.printfln("Failed to serialize time stamps for entry: %v", entry)
+            os.exit(1)
+        }
+        strings.write_string(&builder, start_str)
+        strings.write_string(&builder, "..")
+        strings.write_string(&builder, end_str)
+        strings.write_string(&builder, "\n")
     }
     
     return builder.buf[:]
@@ -48,15 +71,17 @@ deserialize_store :: proc(serialized: []u8) -> (Store, bool) {
     version_value: string
     
     project_key :: "project"
+    entry_key :: "entry"
     
     for line, line_index in next_token_indexed(&lines_it) {
-        key_value_it := tokenize(line, ":")
-        key, key_ok := next_token(&key_value_it)
-        value, value_ok := next_token(&key_value_it)
-        if !key_ok || !value_ok {
+        key_value_split := strings.split_n(line, ":", 2)
+        if len(key_value_split) != 2 {
             fmt.printfln("Failed to parse ini key-value pair from line %v: '%v'.", line_index + 1, line)
             return {}, false
         }
+        
+        key := strings.trim_space(key_value_split[0])
+        value := strings.trim_space(key_value_split[1])
         
         if strings.compare(key, version_key) == 0 {
             version_value = value
@@ -73,6 +98,30 @@ deserialize_store :: proc(serialized: []u8) -> (Store, bool) {
             append(&result.projects, Project {
                 name = project_name,
                 id = project_id,
+            })
+        }
+        else if strings.compare(key, entry_key) == 0 {
+            entry_it := tokenize(value, " ")
+            project_id, id_ok := next_token(&entry_it)
+            time_range, time_ok := next_token(&entry_it)
+            if !id_ok || !time_ok {
+                fmt.printfln("Failed to parse project id and time range from line %v: '%v'.", line_index + 1, line)
+                return {}, false
+            }
+            
+            range_split := strings.split(time_range, "..")
+            if len(range_split) != 2 {
+                fmt.printfln("Failed to parse time range from '%v' in line %v: '%v'.", time_range, line_index + 1, line)
+                return {}, false
+            }
+            
+            start, _ := time.rfc3339_to_time_utc(range_split[0])
+            end, _ := time.rfc3339_to_time_utc(range_split[1])
+            
+            append(&result.entries, Entry {
+                project_id = project_id,
+                start = start,
+                end = end,
             })
         }
         else {
