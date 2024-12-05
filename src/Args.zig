@@ -30,6 +30,7 @@ command: union(enum) {
             month: []const u8,
             year: []const u8,
         },
+        csv: bool,
     },
     version: struct {},
 },
