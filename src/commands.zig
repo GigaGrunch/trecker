@@ -31,7 +31,46 @@ pub fn init(allocator: std.mem.Allocator) !void {
     try store.serialize(allocator);
 }
 
-pub fn summary(allocator: std.mem.Allocator, month_str: []const u8, year_str: []const u8, as_csv: bool) !void {
+const Summary = struct {
+    project_hours: std.MultiArrayList(struct { p: *Store.Project, h: f64 }) = .{},
+    total_hours: f64 = 0,
+    avg_hours_per_day: f64 = 0,
+};
+
+pub fn csv_summary(allocator: std.mem.Allocator, month_str: []const u8, year_str: []const u8) !void {
+    var summary = Summary{};
+    defer summary.project_hours.deinit(allocator);
+
+    var store = try Store.deserialize(allocator, .{});
+    defer store.deinit(allocator);
+
+    try collect_hours(allocator, month_str, year_str, &store, &summary);
+
+    for (summary.project_hours.items(.p), summary.project_hours.items(.h)) |project, hours| {
+        if (hours > 0) {
+            std.debug.print("{s},{d:.0}%\n", .{ project.name, 100.0 * hours / summary.total_hours });
+        }
+    }
+}
+
+pub fn text_summary(allocator: std.mem.Allocator, month_str: []const u8, year_str: []const u8) !void {
+    var summary = Summary{};
+    defer summary.project_hours.deinit(allocator);
+
+    var store = try Store.deserialize(allocator, .{});
+    defer store.deinit(allocator);
+
+    try collect_hours(allocator, month_str, year_str, &store, &summary);
+
+    std.debug.print("Total: {d:.2} hours ({d:.2} hours per day)\n", .{ summary.total_hours, summary.avg_hours_per_day });
+    for (summary.project_hours.items(.p), summary.project_hours.items(.h)) |project, hours| {
+        if (hours > 0) {
+            std.debug.print("{s}: {d:.2} hours ({d:.0} %)\n", .{ project.name, hours, 100.0 * hours / summary.total_hours });
+        }
+    }
+}
+
+fn collect_hours(allocator: std.mem.Allocator, month_str: []const u8, year_str: []const u8, store: *Store, summary: *Summary) !void {
     const month_names: []const []const u8 = &.{
         "january",
         "february",
@@ -56,16 +95,10 @@ pub fn summary(allocator: std.mem.Allocator, month_str: []const u8, year_str: []
 
     const year = try std.fmt.parseInt(u16, year_str, 10);
 
-    var project_hours = std.MultiArrayList(struct { p: *Store.Project, h: f64 }){};
-    defer project_hours.deinit(allocator);
-
-    var store = try Store.deserialize(allocator, .{});
-    defer store.deinit(allocator);
     for (store.projects) |*project| {
-        try project_hours.append(allocator, .{ .p = project, .h = 0 });
+        try summary.project_hours.append(allocator, .{ .p = project, .h = 0 });
     }
 
-    var total_hours: f64 = 0;
     var work_days: [31]Timestamp.Day = undefined;
     var work_days_len: usize = 0;
 
@@ -83,33 +116,18 @@ pub fn summary(allocator: std.mem.Allocator, month_str: []const u8, year_str: []
         } else unreachable;
 
         const hours = entry.getTotalHours();
-        project_hours.items(.h)[project_index] += hours;
-        total_hours += hours;
+        summary.project_hours.items(.h)[project_index] += hours;
+        summary.total_hours += hours;
     }
 
-    const avg_hours_per_day = total_hours / util.float(work_days_len);
+    summary.avg_hours_per_day = summary.total_hours / util.float(work_days_len);
 
-    project_hours.sort(struct {
+    summary.project_hours.sort(struct {
         hours: []const f64,
         pub fn lessThan(ctx: @This(), a: usize, b: usize) bool {
             return ctx.hours[a] > ctx.hours[b];
         }
-    }{ .hours = project_hours.items(.h) });
-    
-    if (as_csv) {
-        for (project_hours.items(.p), project_hours.items(.h)) |project, hours| {
-            if (hours > 0) {
-                std.debug.print("{s},{d:.0}%\n", .{ project.name, 100.0 * hours / total_hours });
-            }
-        }
-    } else {
-        std.debug.print("Total: {d:.2} hours ({d:.2} hours per day)\n", .{ total_hours, avg_hours_per_day });
-        for (project_hours.items(.p), project_hours.items(.h)) |project, hours| {
-            if (hours > 0) {
-                std.debug.print("{s}: {d:.2} hours ({d:.0} %)\n", .{ project.name, hours, 100.0 * hours / total_hours });
-            }
-        }
-    }
+    }{ .hours = summary.project_hours.items(.h) });
 }
 
 pub fn add(allocator: std.mem.Allocator, project_id: []const u8, project_name: []const u8) !void {
@@ -162,10 +180,10 @@ pub fn start(allocator: std.mem.Allocator, project_id: []const u8) !void {
         if (last_entry.start.time.day != other.start.time.day) continue;
         initial_total_today += other.getTotalSeconds();
     }
-    
+
     const redraw_lines = 2;
     std.debug.print("--- Trecker --- \n", .{});
-    std.debug.print("Project: {s} ({s})\n", .{project.name, project.id});
+    std.debug.print("Project: {s} ({s})\n", .{ project.name, project.id });
     for (1..redraw_lines) |_| {
         std.debug.print("\n", .{});
     }
@@ -180,16 +198,16 @@ pub fn start(allocator: std.mem.Allocator, project_id: []const u8) !void {
         const total_hours = getHours(total_today);
         const total_minutes = getMinutes(total_today);
         const total_seconds = getSeconds(total_today);
-        
+
         const go_to_first_line = std.fmt.comptimePrint("\x1b[{d}A", .{redraw_lines - 1});
         const clear_line = "\x1b[2K\r";
         std.debug.print("{s}", .{go_to_first_line});
         std.debug.print("{s}", .{clear_line});
-        std.debug.print("Current entry: {d}:{d:0>2}:{d:0>2}\n", .{hours, minutes, seconds});
+        std.debug.print("Current entry: {d}:{d:0>2}:{d:0>2}\n", .{ hours, minutes, seconds });
         std.debug.print("{s}", .{clear_line});
-        std.debug.print("Total today: {d}:{d:0>2}:{d:0>2}", .{total_hours, total_minutes, total_seconds});
-        
-        std.debug.print("\x1b]0;{s} {s} {d}:{d:0>2}:{d:0>2}\x07", .{util.exe_name, project.id, total_hours, total_minutes, total_seconds});
+        std.debug.print("Total today: {d}:{d:0>2}:{d:0>2}", .{ total_hours, total_minutes, total_seconds });
+
+        std.debug.print("\x1b]0;{s} {s} {d}:{d:0>2}:{d:0>2}\x07", .{ util.exe_name, project.id, total_hours, total_minutes, total_seconds });
 
         const entry_minutes = getMinutes(raw_end - raw_start);
         if (entry_minutes != minutes) {

@@ -17,7 +17,8 @@ pub fn main() !void {
         .start => |sub_args| commands.start(allocator, sub_args.positional.project_id),
         .add => |sub_args| commands.add(allocator, sub_args.positional.project_id, sub_args.positional.project_name),
         .list => commands.list(allocator),
-        .summary => |sub_args| commands.summary(allocator, sub_args.positional.month, sub_args.positional.year, sub_args.csv),
+        .summary => |sub_args| commands.text_summary(allocator, sub_args.positional.month, sub_args.positional.year),
+        .csv => |sub_args| commands.csv_summary(allocator, sub_args.positional.month, sub_args.positional.year),
         .version => commands.version(),
     };
 }
