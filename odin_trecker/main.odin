@@ -55,16 +55,25 @@ command_start :: proc(args: StartArgs) {
     store, store_ok := read_store_file()
     if !store_ok do os.exit(1)
     
-    project_ok := false
-    for project in store.projects {
-        if strings.compare(project.id, args.project_id) == 0 {
-            project_ok = true
+    project: Project
+    for other_project in store.projects {
+        if strings.compare(other_project.id, args.project_id) == 0 {
+            project = other_project
             break
         }
     }
-    if !project_ok {
+    if project == {} {
         fmt.printfln("Project with id '%v' does not exist.", args.project_id)
         os.exit(1)
+    }
+    
+    start_year, start_month, start_day := time.date(time.now())    
+    initial_today_duration: time.Duration
+    for other in store.entries {
+        other_year, other_month, other_day := time.date(other.start)
+        if start_year == other_year && start_month == other_month && start_day == other_day {
+            initial_today_duration += time.diff(other.start, other.end)
+        }
     }
     
     entry_index := len(store.entries)
@@ -77,15 +86,18 @@ command_start :: proc(args: StartArgs) {
     
     last_serialization_minute := 0
     duration_buf: [len("00:00:00")]u8
+    today_duration_buf: [len("00:00:00")]u8
     
     for {
         defer free_all(context.temp_allocator)
     
         duration := time.since(entry.start)
         duration_str := time.duration_to_string_hms(duration, duration_buf[:])
+        today_duration := initial_today_duration + duration
+        today_duration_str := time.duration_to_string_hms(today_duration, today_duration_buf[:])
     
         clear_line :: "\x1b[2K\r";
-        fmt.printf("%v%v\r", clear_line, duration_str)
+        fmt.printf("%v%v %v (%v)\r", clear_line, project.name, duration_str, today_duration_str)
         
         full_minute := int(time.duration_minutes(duration))
         if full_minute > last_serialization_minute {
