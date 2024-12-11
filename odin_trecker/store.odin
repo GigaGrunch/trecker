@@ -43,6 +43,16 @@ store_add_project :: proc(store: ^Store, id, name: string) {
     })
 }
 
+store_add_entry :: proc(store: ^Store, project_id: string, start, end: time.Time) -> ^Entry {
+    index := len(store.entries)
+    append(&store.entries, Entry {
+        project_id = fmt.aprint(project_id),
+        start = start,
+        end = end,
+    })
+    return &store.entries[index]
+}
+
 store_serialize :: proc(store: Store) -> []u8 {
     builder := strings.builder_make()
     

@@ -66,6 +66,7 @@ command_add :: proc(args: AddArgs) {
 
 command_start :: proc(args: StartArgs) {
     store, store_ok := read_store_file()
+    defer store_destroy(&store)
     if !store_ok do os.exit(1)
     
     project: Project
@@ -89,13 +90,7 @@ command_start :: proc(args: StartArgs) {
         }
     }
     
-    entry_index := len(store.entries)
-    append(&store.entries, Entry {
-        project_id = args.project_id,
-        start = time.now(),
-        end = time.now(),
-    })
-    entry := &store.entries[entry_index]
+    entry := store_add_entry(&store, args.project_id, time.now(), time.now())
     
     last_serialization_minute := 0
     duration_buf: [len("00:00:00")]u8
