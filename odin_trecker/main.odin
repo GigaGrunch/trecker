@@ -4,8 +4,14 @@ import "core:os"
 import "core:fmt"
 import "core:strings"
 import "core:time"
+import "core:mem"
 
 main :: proc() {
+    track: mem.Tracking_Allocator
+    mem.tracking_allocator_init(&track, context.allocator)
+    context.allocator = mem.tracking_allocator(&track)
+    defer deinit_tracking_allocator(&track)
+
     args, args_ok := parse_args(os.args[1:])
     if !args_ok do os.exit(1)
     
@@ -90,8 +96,6 @@ command_start :: proc(args: StartArgs) {
     today_duration_buf: [len("00:00:00")]u8
     
     for {
-        defer free_all(context.temp_allocator)
-    
         duration := time.since(entry.start)
         duration_str := time.duration_to_string_hms(duration, duration_buf[:])
         today_duration := initial_today_duration + duration
@@ -140,4 +144,20 @@ write_store_file :: proc(store: Store) -> bool {
         return false
     }
     return true
+}
+
+deinit_tracking_allocator :: proc(track: ^mem.Tracking_Allocator) {
+    if len(track.allocation_map) > 0 {
+        fmt.eprintf("=== %v allocations not freed: ===\n", len(track.allocation_map))
+        for _, entry in track.allocation_map {
+            fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
+        }
+    }
+    if len(track.bad_free_array) > 0 {
+        fmt.eprintf("=== %v incorrect frees: ===\n", len(track.bad_free_array))
+        for entry in track.bad_free_array {
+            fmt.eprintf("- %p @ %v\n", entry.memory, entry.location)
+        }
+    }
+    mem.tracking_allocator_destroy(track)
 }
