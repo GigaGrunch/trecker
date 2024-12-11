@@ -38,6 +38,7 @@ command_init :: proc() {
 
 command_add :: proc(args: AddArgs) {
     store, store_ok := read_store_file()
+    defer store_destroy(&store)
     if !store_ok do os.exit(1)
     
     for other_project in store.projects {
@@ -47,12 +48,7 @@ command_add :: proc(args: AddArgs) {
         }
     }
     
-    project := Project {
-        name = args.project_name,
-        id = args.project_id,
-    }
-    
-    append(&store.projects, project)
+    store_add_project(&store, args.project_id, args.project_name)
     
     write_ok := write_store_file(store)
     if !write_ok do os.exit(1)

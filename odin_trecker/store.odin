@@ -36,6 +36,13 @@ store_destroy :: proc(store: ^Store) {
     store^ = {}
 }
 
+store_add_project :: proc(store: ^Store, id, name: string) {
+    append(&store.projects, Project {
+        id = fmt.aprint(id),
+        name = fmt.aprint(name),
+    })
+}
+
 store_serialize :: proc(store: Store) -> []u8 {
     builder := strings.builder_make()
     
@@ -58,6 +65,10 @@ store_serialize :: proc(store: Store) -> []u8 {
         strings.write_string(&builder, " ")
         start_str, start_ok := time.time_to_rfc3339(entry.start)
         end_str, end_ok := time.time_to_rfc3339(entry.end)
+        defer {
+            delete(start_str)
+            delete(end_str)
+        }
         if !start_ok || !end_ok {
             fmt.printfln("Failed to serialize time stamps for entry: %v", entry)
             os.exit(1)
@@ -73,7 +84,7 @@ store_serialize :: proc(store: Store) -> []u8 {
 }
 
 store_deserialize :: proc(serialized: string) -> (res: Store, ok: bool) {
-    result: Store
+    store: Store
     
     version_key :: "version"
     version_value: string
@@ -105,10 +116,7 @@ store_deserialize :: proc(serialized: string) -> (res: Store, ok: bool) {
                 fmt.printfln("Failed to parse project id and name from line %v: '%v'.", line_number, line)
                 return {}, false
             }
-            append(&result.projects, Project {
-                id = fmt.aprint(id),
-                name = fmt.aprint(name),
-            })
+            store_add_project(&store, id, name)
         } else if strings.compare(key, entry_key) == 0 {
             project_id, id_ok := strings.split_iterator(&value, " ")
             time_range := value
@@ -127,7 +135,7 @@ store_deserialize :: proc(serialized: string) -> (res: Store, ok: bool) {
             start := parse_time(start_str) or_return
             end := parse_time(end_str) or_return
             
-            append(&result.entries, Entry {
+            append(&store.entries, Entry {
                 project_id = fmt.aprint(project_id),
                 start = start,
                 end = end,
@@ -148,7 +156,7 @@ store_deserialize :: proc(serialized: string) -> (res: Store, ok: bool) {
         return {}, false
     }
     
-    return result, true
+    return store, true
 }
 
 parse_time :: proc(str: string) -> (res: time.Time, ok: bool) {
