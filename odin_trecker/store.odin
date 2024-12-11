@@ -25,7 +25,7 @@ Entry :: struct {
     end: time.Time,
 }
 
-serialize_store :: proc(store: Store) -> []u8 {
+store_serialize :: proc(store: Store) -> []u8 {
     builder := strings.builder_make()
     
     strings.write_string(&builder, "version: ") // TODO: these are the same consts as in deserialize

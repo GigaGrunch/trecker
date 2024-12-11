@@ -137,7 +137,8 @@ read_store_file :: proc() -> (Store, bool) {
 }
 
 write_store_file :: proc(store: Store) -> bool {
-    serialized := serialize_store(store)
+    serialized := store_serialize(store)
+    defer delete(serialized)
     write_ok := os.write_entire_file(session_file_path, serialized)
     if !write_ok {
         fmt.printfln("Failed to write file at '%v'.", session_file_path)
