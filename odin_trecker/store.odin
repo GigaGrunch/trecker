@@ -86,8 +86,7 @@ deserialize_store :: proc(serialized: []u8) -> (res: Store, ok: bool) {
         
         if strings.compare(key, version_key) == 0 {
             version_value = value
-        }
-        else if strings.compare(key, project_key) == 0 {
+        } else if strings.compare(key, project_key) == 0 {
             project_split := strings.split_n(value, " ", 2)
             if len(project_split) != 2 {
                 fmt.printfln("Failed to parse project id and name from linee %v: '%v'.", line_index + 1, line)
@@ -99,8 +98,7 @@ deserialize_store :: proc(serialized: []u8) -> (res: Store, ok: bool) {
                 name = project_name,
                 id = project_id,
             })
-        }
-        else if strings.compare(key, entry_key) == 0 {
+        } else if strings.compare(key, entry_key) == 0 {
             entry_it := tokenize(value, " ")
             project_id, id_ok := next_token(&entry_it)
             time_range, time_ok := next_token(&entry_it)
@@ -123,8 +121,7 @@ deserialize_store :: proc(serialized: []u8) -> (res: Store, ok: bool) {
                 start = start,
                 end = end,
             })
-        }
-        else {
+        } else {
             fmt.printfln("Unknown ini key '%v' found in line %v: '%v'.", key, line_index + 1, line) // TODO: the line numbers aren't correct because empty lines are skipped
             return {}, false
         }

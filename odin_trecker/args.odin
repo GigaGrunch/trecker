@@ -13,7 +13,7 @@ Args :: struct {
     inner: union {
         AddArgs,
         StartArgs,
-    }
+    },
 }
 
 AddArgs :: struct {
@@ -62,7 +62,7 @@ parse_args :: proc(raw_args: []string) -> (Args, bool) {
         
         return Args {
             type = .start,
-            inner = StartArgs { project_id = raw_args[1] }
+            inner = StartArgs { project_id = raw_args[1] },
         }, true
     }
 
