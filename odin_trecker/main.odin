@@ -118,6 +118,7 @@ command_start :: proc(args: StartArgs) {
 
 command_list :: proc() {
     store, store_ok := read_store_file()
+    defer store_destroy(&store)
     if !store_ok do os.exit(1)
     
     fmt.printfln("%v registered projects:", len(store.projects))
@@ -129,11 +130,12 @@ command_list :: proc() {
 
 read_store_file :: proc() -> (Store, bool) {
     serialized, file_ok := os.read_entire_file(session_file_path)
+    defer delete(serialized)
     if !file_ok {
         fmt.printfln("Failed to read file at '%v'.", session_file_path)
         return {}, false
     }
-    return deserialize_store(serialized)
+    return store_deserialize(transmute(string)serialized)
 }
 
 write_store_file :: proc(store: Store) -> bool {
