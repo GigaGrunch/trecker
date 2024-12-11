@@ -34,6 +34,7 @@ main :: proc() {
     case .start: command_start(args.inner.(Start_Args))
     case .list: command_list()
     case .summary: command_summary(args.inner.(Summary_Args))
+    case .csv: command_csv(args.inner.(Csv_Args))
     }
 }
 
@@ -135,7 +136,20 @@ command_list :: proc() {
     }
 }
 
-command_summary :: proc(args: Summary_Args) {
+Summary :: struct {
+    total_hours: f64,
+    daily_average: f64,
+    sorted_project_hours: [dynamic]f64,
+    projects_by_hours: map[f64]string,
+}
+
+summary_destroy :: proc(summary: ^Summary) {
+    delete(summary.sorted_project_hours)
+    delete(summary.projects_by_hours)
+    summary^ = {}
+}
+
+summary_make :: proc(args: Summary_Args, store: Store) -> Summary {
     months := []string { "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december" }
     month_i := 0
     for ;month_i < len(months); month_i += 1 do if strings.compare(months[month_i], args.month) == 0 do break
@@ -149,10 +163,6 @@ command_summary :: proc(args: Summary_Args) {
         fmt.printfln("Failed to parse valid year from '%v'.", args.year)
         os.exit(1)
     }
-    
-    store, store_ok := read_store_file()
-    defer store_destroy(&store)
-    if !store_ok do os.exit(1)
     
     project_durations: map[string]time.Duration
     defer delete(project_durations)
@@ -169,29 +179,31 @@ command_summary :: proc(args: Summary_Args) {
         unique_days[entry_day] = 1
     }
     
-    sorted_project_hours: [dynamic]f64
-    defer delete(sorted_project_hours)
-    
-    projects_by_hours: map[f64]string
-    defer delete(projects_by_hours)
-    
-    total_hours: f64
-    
+    summary: Summary
     for project_id, project_duration in project_durations {
         hours := time.duration_hours(project_duration)
-        append(&sorted_project_hours, hours)
-        projects_by_hours[hours] = project_id
-        total_hours += hours
+        append(&summary.sorted_project_hours, hours)
+        summary.projects_by_hours[hours] = project_id
+        summary.total_hours += hours
     }
+    sort.bubble_sort(summary.sorted_project_hours[:])
+    slice.reverse(summary.sorted_project_hours[:])
+    summary.daily_average = summary.total_hours / f64(len(unique_days))
+    return summary
+}
+
+command_summary :: proc(args: Summary_Args) {
+    store, store_ok := read_store_file()
+    defer store_destroy(&store)
+    if !store_ok do os.exit(1)
+
+    summary := summary_make(args, store)
+    defer summary_destroy(&summary)
+
+    fmt.printfln("Total: %.2f hours (%.2f hours per day)", summary.total_hours, summary.daily_average)
     
-    daily_average := total_hours / f64(len(unique_days))
-    fmt.printfln("Total: %.2f hours (%.2f hours per day)", total_hours, daily_average)
-    
-    sort.bubble_sort(sorted_project_hours[:])
-    slice.reverse(sorted_project_hours[:])
-    
-    for hours in sorted_project_hours {
-        project_id := projects_by_hours[hours]
+    for hours in summary.sorted_project_hours {
+        project_id := summary.projects_by_hours[hours]
         project_name: string
         for project in store.projects {
             if strings.compare(project.id, project_id) == 0 {
@@ -203,9 +215,34 @@ command_summary :: proc(args: Summary_Args) {
             os.exit(1)
         }
         
-        percent := 100 * hours / total_hours
-    
+        percent := 100 * hours / summary.total_hours
         fmt.printfln("%v: %.2f hours (%.0f %%)", project_name, hours, percent)
+    }
+}
+
+command_csv :: proc(args: Csv_Args) {
+    store, store_ok := read_store_file()
+    defer store_destroy(&store)
+    if !store_ok do os.exit(1)
+    
+    summary := summary_make(cast(Summary_Args)args, store)
+    defer summary_destroy(&summary)
+    
+    for hours in summary.sorted_project_hours {
+        project_id := summary.projects_by_hours[hours]
+        project_name: string
+        for project in store.projects {
+            if strings.compare(project.id, project_id) == 0 {
+                project_name = project.name
+            }
+        }
+        if project_name == {} {
+            fmt.printfln("Did not find project with id '%v'.", project_id)
+            os.exit(1)
+        }
+        
+        percent := 100 * hours / summary.total_hours
+        fmt.printfln("%v,%v,%.0f%%", args.user_name, project_name, percent)
     }
 }
 

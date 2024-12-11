@@ -10,12 +10,14 @@ Args :: struct {
         start,
         list,
         summary,
+        csv,
     },
     
     inner: union {
         Add_Args,
         Start_Args,
         Summary_Args,
+        Csv_Args,
     },
 }
 
@@ -31,6 +33,11 @@ Start_Args :: struct {
 Summary_Args :: struct {
     month: string,
     year: string,
+}
+
+Csv_Args :: struct {
+    using base: Summary_Args,
+    user_name: string,
 }
 
 parse_args :: proc(raw_args: []string) -> (Args, bool) {
@@ -91,6 +98,29 @@ parse_args :: proc(raw_args: []string) -> (Args, bool) {
             inner = Summary_Args {
                 month = raw_args[1],
                 year = raw_args[2],
+            },
+        }, true
+    }
+    if strings.compare(command_str, "csv") == 0 {
+        if len(raw_args) < 2 {
+            fmt.println("Missing argument: month")
+            return {}, false
+        }
+        if len(raw_args) < 3 {
+            fmt.println("Missing argument: year")
+            return {}, false
+        }
+        if len(raw_args) < 4 {
+            fmt.println("Missing argument: user_name")
+            return {}, false
+        }
+        
+        return Args {
+            type = .csv,
+            inner = Csv_Args {
+                month = raw_args[1],
+                year = raw_args[2],
+                user_name = raw_args[3],
             },
         }, true
     }
