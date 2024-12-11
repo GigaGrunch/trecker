@@ -157,12 +157,16 @@ command_summary :: proc(args: Summary_Args) {
     project_durations: map[string]time.Duration
     defer delete(project_durations)
     
+    unique_days: map[int]u8
+    defer delete(unique_days)
+    
     for entry in store.entries {
-        entry_year, entry_month, _ := time.date(entry.start)
+        entry_year, entry_month, entry_day := time.date(entry.start)
         if entry_year != summary_year || entry_month != summary_month do continue
         entry_duration := time.diff(entry.start, entry.end)
         project_duration := project_durations[entry.project_id]
         project_durations[entry.project_id] = project_duration + entry_duration
+        unique_days[entry_day] = 1
     }
     
     sorted_project_hours: [dynamic]f64
@@ -180,7 +184,8 @@ command_summary :: proc(args: Summary_Args) {
         total_hours += hours
     }
     
-    fmt.printfln("Total: %.2f hours", total_hours)
+    daily_average := total_hours / f64(len(unique_days))
+    fmt.printfln("Total: %.2f hours (%.2f hours per day)", total_hours, daily_average)
     
     sort.bubble_sort(sorted_project_hours[:])
     slice.reverse(sorted_project_hours[:])
