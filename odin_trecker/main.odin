@@ -3,8 +3,11 @@ package trecker
 import "core:os"
 import "core:fmt"
 import "core:strings"
+import "core:strconv"
 import "core:time"
 import "core:mem"
+import "core:sort"
+import "core:slice"
 import "core:c/libc"
 
 got_interrupt_signal := false
@@ -27,9 +30,10 @@ main :: proc() {
     
     switch args.type {
     case .init: command_init()
-    case .add: command_add(args.inner.(AddArgs))
-    case .start: command_start(args.inner.(StartArgs))
+    case .add: command_add(args.inner.(Add_Args))
+    case .start: command_start(args.inner.(Start_Args))
     case .list: command_list()
+    case .summary: command_summary(args.inner.(Summary_Args))
     }
 }
 
@@ -46,7 +50,7 @@ command_init :: proc() {
     if !write_ok do os.exit(1)
 }
 
-command_add :: proc(args: AddArgs) {
+command_add :: proc(args: Add_Args) {
     store, store_ok := read_store_file()
     defer store_destroy(&store)
     if !store_ok do os.exit(1)
@@ -64,7 +68,7 @@ command_add :: proc(args: AddArgs) {
     if !write_ok do os.exit(1)
 }
 
-command_start :: proc(args: StartArgs) {
+command_start :: proc(args: Start_Args) {
     store, store_ok := read_store_file()
     defer store_destroy(&store)
     if !store_ok do os.exit(1)
@@ -128,6 +132,68 @@ command_list :: proc() {
     
     for project in store.projects {
         fmt.printfln("%v: %v", project.id, project.name)
+    }
+}
+
+command_summary :: proc(args: Summary_Args) {
+    months := []string { "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december" }
+    month_i := 0
+    for ;month_i < len(months); month_i += 1 do if strings.compare(months[month_i], args.month) == 0 do break
+    if month_i == len(months) {
+        fmt.printfln("'%v' is not a known month.", args.month)
+        os.exit(1)
+    }
+    summary_month := time.Month(month_i + 1)
+    summary_year, year_ok := strconv.parse_int(args.year)
+    if !year_ok || summary_year < 0 {
+        fmt.printfln("Failed to parse valid year from '%v'.", args.year)
+        os.exit(1)
+    }
+    
+    store, store_ok := read_store_file()
+    defer store_destroy(&store)
+    if !store_ok do os.exit(1)
+    
+    project_durations: map[string]time.Duration
+    defer delete(project_durations)
+    
+    for entry in store.entries {
+        entry_year, entry_month, _ := time.date(entry.start)
+        if entry_year != summary_year || entry_month != summary_month do continue
+        entry_duration := time.diff(entry.start, entry.end)
+        project_duration := project_durations[entry.project_id]
+        project_durations[entry.project_id] = project_duration + entry_duration
+    }
+    
+    sorted_project_hours: [dynamic]f64
+    defer delete(sorted_project_hours)
+    
+    projects_by_hours: map[f64]string
+    defer delete(projects_by_hours)
+    
+    for project_id, project_duration in project_durations {
+        hours := time.duration_hours(project_duration)
+        append(&sorted_project_hours, hours)
+        projects_by_hours[hours] = project_id
+    }
+    
+    sort.bubble_sort(sorted_project_hours[:])
+    slice.reverse(sorted_project_hours[:])
+    
+    for hours in sorted_project_hours {
+        project_id := projects_by_hours[hours]
+        project_name: string
+        for project in store.projects {
+            if strings.compare(project.id, project_id) == 0 {
+                project_name = project.name
+            }
+        }
+        if project_name == {} {
+            fmt.printfln("Did not find project with id '%v'.", project_id)
+            os.exit(1)
+        }
+    
+        fmt.printfln("%v: %.2f hours", project_name, hours)
     }
 }
 

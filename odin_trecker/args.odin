@@ -9,21 +9,28 @@ Args :: struct {
         add,
         start,
         list,
+        summary,
     },
     
     inner: union {
-        AddArgs,
-        StartArgs,
+        Add_Args,
+        Start_Args,
+        Summary_Args,
     },
 }
 
-AddArgs :: struct {
+Add_Args :: struct {
     project_name: string,
     project_id: string,
 }
 
-StartArgs :: struct {
+Start_Args :: struct {
     project_id: string,
+}
+
+Summary_Args :: struct {
+    month: string,
+    year: string,
 }
 
 parse_args :: proc(raw_args: []string) -> (Args, bool) {
@@ -49,7 +56,7 @@ parse_args :: proc(raw_args: []string) -> (Args, bool) {
         
         return Args {
             type = .add,
-            inner = AddArgs {
+            inner = Add_Args {
                 project_id = raw_args[1],
                 project_name = raw_args[2],
             },
@@ -63,11 +70,29 @@ parse_args :: proc(raw_args: []string) -> (Args, bool) {
         
         return Args {
             type = .start,
-            inner = StartArgs { project_id = raw_args[1] },
+            inner = Start_Args { project_id = raw_args[1] },
         }, true
     }
     if strings.compare(command_str, "list") == 0 {
         return Args { type = .list }, true
+    }
+    if strings.compare(command_str, "summary") == 0 {
+        if len(raw_args) < 2 {
+            fmt.println("Missing argument: month")
+            return {}, false
+        }
+        if len(raw_args) < 3 {
+            fmt.println("Missing argument: year")
+            return {}, false
+        }
+        
+        return Args {
+            type = .summary,
+            inner = Summary_Args {
+                month = raw_args[1],
+                year = raw_args[2],
+            },
+        }, true
     }
 
     fmt.printfln("Unknown command: '%v'.", command_str)
