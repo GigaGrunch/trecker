@@ -26,8 +26,6 @@ Entry :: struct {
 }
 
 serialize_store :: proc(store: Store) -> []u8 {
-    context.allocator = context.temp_allocator
-
     builder := strings.builder_make()
     
     strings.write_string(&builder, "version: ") // TODO: these are the same consts as in deserialize
