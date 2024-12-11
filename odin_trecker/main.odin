@@ -5,8 +5,18 @@ import "core:fmt"
 import "core:strings"
 import "core:time"
 import "core:mem"
+import "core:c/libc"
+
+got_interrupt_signal := false
+
+handle_interrupt_signal :: proc "c" (_: i32) {
+    if got_interrupt_signal do os.exit(1)
+    got_interrupt_signal = true
+}
 
 main :: proc() {
+    libc.signal(libc.SIGINT, handle_interrupt_signal)
+
     track: mem.Tracking_Allocator
     mem.tracking_allocator_init(&track, context.allocator)
     context.allocator = mem.tracking_allocator(&track)
@@ -91,7 +101,7 @@ command_start :: proc(args: StartArgs) {
     duration_buf: [len("00:00:00")]u8
     today_duration_buf: [len("00:00:00")]u8
     
-    for {
+    for !got_interrupt_signal {
         duration := time.since(entry.start)
         duration_str := time.duration_to_string_hms(duration, duration_buf[:])
         today_duration := initial_today_duration + duration
@@ -110,6 +120,8 @@ command_start :: proc(args: StartArgs) {
         
         time.sleep(1 * time.Second)
     }
+    
+    fmt.println()
 }
 
 command_list :: proc() {
