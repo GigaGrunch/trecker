@@ -8,6 +8,7 @@ Args :: struct {
         init,
         add,
         start,
+        list,
     },
     
     inner: union {
@@ -64,6 +65,9 @@ parse_args :: proc(raw_args: []string) -> (Args, bool) {
             type = .start,
             inner = StartArgs { project_id = raw_args[1] },
         }, true
+    }
+    if strings.compare(command_str, "list") == 0 {
+        return Args { type = .list }, true
     }
 
     fmt.printfln("Unknown command: '%v'.", command_str)

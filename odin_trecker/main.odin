@@ -13,6 +13,7 @@ main :: proc() {
     case .init: command_init()
     case .add: command_add(args.inner.(AddArgs))
     case .start: command_start(args.inner.(StartArgs))
+    case .list: command_list()
     }
 }
 
@@ -108,6 +109,17 @@ command_start :: proc(args: StartArgs) {
         }
         
         time.sleep(1 * time.Second)
+    }
+}
+
+command_list :: proc() {
+    store, store_ok := read_store_file()
+    if !store_ok do os.exit(1)
+    
+    fmt.printfln("%v registered projects:", len(store.projects))
+    
+    for project in store.projects {
+        fmt.printfln("%v: %v", project.id, project.name)
     }
 }
 
