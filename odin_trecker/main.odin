@@ -171,11 +171,16 @@ command_summary :: proc(args: Summary_Args) {
     projects_by_hours: map[f64]string
     defer delete(projects_by_hours)
     
+    total_hours: f64
+    
     for project_id, project_duration in project_durations {
         hours := time.duration_hours(project_duration)
         append(&sorted_project_hours, hours)
         projects_by_hours[hours] = project_id
+        total_hours += hours
     }
+    
+    fmt.printfln("Total: %.2f hours", total_hours)
     
     sort.bubble_sort(sorted_project_hours[:])
     slice.reverse(sorted_project_hours[:])
@@ -192,8 +197,10 @@ command_summary :: proc(args: Summary_Args) {
             fmt.printfln("Did not find project with id '%v'.", project_id)
             os.exit(1)
         }
+        
+        percent := 100 * hours / total_hours
     
-        fmt.printfln("%v: %.2f hours", project_name, hours)
+        fmt.printfln("%v: %.2f hours (%.0f %%)", project_name, hours, percent)
     }
 }
 
