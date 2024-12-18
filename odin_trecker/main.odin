@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:strings"
 import "core:strconv"
 import "core:time"
+import "core:math"
 import "core:mem"
 import "core:sort"
 import "core:slice"
@@ -140,11 +141,13 @@ Summary :: struct {
     total_hours: f64,
     daily_average: f64,
     sorted_project_hours: [dynamic]f64,
+    sorted_percentages: [dynamic]int,
     projects_by_hours: map[f64]string,
 }
 
 summary_destroy :: proc(summary: ^Summary) {
     delete(summary.sorted_project_hours)
+    delete(summary.sorted_percentages)
     delete(summary.projects_by_hours)
     summary^ = {}
 }
@@ -180,14 +183,28 @@ summary_make :: proc(args: Summary_Args, store: Store) -> Summary {
     }
     
     summary: Summary
+    
     for project_id, project_duration in project_durations {
         hours := time.duration_hours(project_duration)
         append(&summary.sorted_project_hours, hours)
+        append(&summary.sorted_percentages, 0)
         summary.projects_by_hours[hours] = project_id
         summary.total_hours += hours
     }
+    
+    for &percentage, i in summary.sorted_percentages {
+        hours := summary.sorted_project_hours[i]
+        percentage = int(math.round(100.0 * hours / summary.total_hours))
+    }
+    
     sort.bubble_sort(summary.sorted_project_hours[:])
+    sort.bubble_sort(summary.sorted_percentages[:])
     slice.reverse(summary.sorted_project_hours[:])
+    slice.reverse(summary.sorted_percentages[:])
+    
+    diff := 100 - math.sum(summary.sorted_percentages[:])
+    summary.sorted_percentages[0] += diff
+    
     summary.daily_average = summary.total_hours / f64(len(unique_days))
     return summary
 }
@@ -202,7 +219,7 @@ command_summary :: proc(args: Summary_Args) {
 
     fmt.printfln("Total: %.2f hours (%.2f hours per day)", summary.total_hours, summary.daily_average)
     
-    for hours in summary.sorted_project_hours {
+    for hours, i in summary.sorted_project_hours {
         project_id := summary.projects_by_hours[hours]
         project_name: string
         for project in store.projects {
@@ -215,8 +232,7 @@ command_summary :: proc(args: Summary_Args) {
             os.exit(1)
         }
         
-        percent := 100 * hours / summary.total_hours
-        fmt.printfln("%v: %.2f hours (%.0f %%)", project_name, hours, percent)
+        fmt.printfln("%v: %.2f hours (%v %%)", project_name, hours, summary.sorted_percentages[i])
     }
 }
 
@@ -228,7 +244,7 @@ command_csv :: proc(args: Csv_Args) {
     summary := summary_make(cast(Summary_Args)args, store)
     defer summary_destroy(&summary)
     
-    for hours in summary.sorted_project_hours {
+    for hours, i in summary.sorted_project_hours {
         project_id := summary.projects_by_hours[hours]
         project_name: string
         for project in store.projects {
@@ -241,8 +257,7 @@ command_csv :: proc(args: Csv_Args) {
             os.exit(1)
         }
         
-        percent := 100 * hours / summary.total_hours
-        fmt.printfln("%v,%v,%.0f%%", args.user_name, project_name, percent)
+        fmt.printfln("%v,%v,%v%%", args.user_name, project_name, summary.sorted_percentages[i])
     }
 }
 
