@@ -2,9 +2,14 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 comptime {
-    const zig_version = .{ .major = 0, .minor = 13, .patch = 0 };
-    const compatible = builtin.zig_version.order(zig_version) == .eq;
-    const message = std.fmt.comptimePrint("Zig version {d}.{d}.{d} is required.", .{ zig_version.major, zig_version.minor, zig_version.patch });
+    const zig_version = std.SemanticVersion { .major = 0, .minor = 14, .patch = 0 };
+    const compatible = zig_version.major == builtin.zig_version.major and zig_version.minor == builtin.zig_version.minor;
+    const message = std.fmt.comptimePrint("Zig version {d}.{d} is required, but got {d}.{d}", .{
+        zig_version.major,
+        zig_version.minor,
+        builtin.zig_version.major,
+        builtin.zig_version.minor,
+    });
     if (!compatible) @compileError(message);
 }
 
@@ -61,14 +66,14 @@ fn parseGitCommitHash(b: *std.Build) []const u8 {
 
     const head_text = git_root.readFileAlloc(b.allocator, "HEAD", 1000) catch return fallback;
 
-    var head_text_it = std.mem.tokenize(u8, head_text, " \r\n");
+    var head_text_it = std.mem.tokenizeAny(u8, head_text, " \r\n");
     const head_key = head_text_it.next() orelse return fallback;
     if (!std.mem.eql(u8, head_key, "ref:")) return fallback;
     const head_value = head_text_it.next() orelse return fallback;
 
     const ref_text = git_root.readFileAlloc(b.allocator, head_value, 1000) catch return fallback;
 
-    var ref_text_it = std.mem.tokenize(u8, ref_text, "\r\n");
+    var ref_text_it = std.mem.tokenizeAny(u8, ref_text, "\r\n");
     const ref_value = ref_text_it.next() orelse return fallback;
 
     return b.allocator.dupe(u8, ref_value) catch return fallback;
