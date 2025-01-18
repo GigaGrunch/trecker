@@ -73,7 +73,7 @@ fn parse(allocator: std.mem.Allocator, options: DeserializeOptions, text: []cons
     var entries: std.ArrayListUnmanaged(Entry) = .{};
     defer entries.deinit(allocator);
 
-    var lines_it = std.mem.split(u8, text, "\n");
+    var lines_it = std.mem.splitScalar(u8, text, '\n');
     const version_line = lines_it.first();
     const version = getTrimmedValue(version_line, "version");
     if (version == null) return error.MissingVersion;
@@ -81,7 +81,7 @@ fn parse(allocator: std.mem.Allocator, options: DeserializeOptions, text: []cons
 
     while (lines_it.next()) |line| {
         if (getTrimmedValue(line, "project")) |project_str| {
-            var space_split = std.mem.split(u8, project_str, " ");
+            var space_split = std.mem.splitScalar(u8, project_str, ' ');
             const id = space_split.first();
             const rest = project_str[id.len + 1 ..];
             const name = std.mem.trim(u8, rest, "'");
@@ -90,10 +90,10 @@ fn parse(allocator: std.mem.Allocator, options: DeserializeOptions, text: []cons
                 .name = try allocator.dupe(u8, name),
             });
         } else if (getTrimmedValue(line, "entry")) |entry_str| {
-            var space_split = std.mem.split(u8, entry_str, " ");
+            var space_split = std.mem.splitScalar(u8, entry_str, ' ');
             const project_id = space_split.first();
             const rest = entry_str[project_id.len + 1 ..];
-            var range_it = std.mem.split(u8, rest, "..");
+            var range_it = std.mem.splitSequence(u8, rest, "..");
             const start_str = range_it.next().?;
             const end_str = range_it.next().?;
             try entries.append(allocator, .{
