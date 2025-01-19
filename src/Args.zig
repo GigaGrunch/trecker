@@ -9,6 +9,7 @@ command: union(enum) {
         .add = "Adds a new project.",
         .list = "Lists all known projects.",
         .summary = "Prints the work summary for one specific month.",
+        .csv = "Prints the work summary for one specific month in csv format.",
         .version = "Prints info about the version of " ++ name,
     };
 
