@@ -38,9 +38,6 @@ pub fn build(b: *std.Build) !void {
 
     exe.root_module.addOptions("build_info", build_info);
 
-    const flags = b.dependency("flags", .{});
-    exe.root_module.addImport("flags", flags.module("flags"));
-
     const zeit = b.dependency("zeit", .{});
     exe.root_module.addImport("zeit", zeit.module("zeit"));
 

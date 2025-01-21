@@ -1,8 +1,46 @@
+const std = @import("std");
 const util = @import("util.zig");
+const Args = @This();
 
 pub const name = util.exe_name;
 
-command: union(enum) {
+pub fn parseOrExit(args_it: *std.process.ArgIterator) Args {
+    _ = args_it.skip();
+    const command_name = args_it.next() orelse util.fatal("TODO", .{});
+    const command_enum = std.meta.stringToEnum(std.meta.FieldEnum(Command), command_name) orelse util.fatal("TODO", .{});
+
+    return .{ .command = switch (command_enum) {
+        .init => .{ .init = .{} },
+        .start => .{ .start = .{
+            .positional = .{ .project_id = args_it.next() orelse util.fatal("TODO", .{}) },
+        }},
+        .add => .{ .add = .{
+            .positional = .{
+                .project_id = args_it.next() orelse util.fatal("TODO", .{}),
+                .project_name = args_it.next() orelse util.fatal("TODO", .{}),
+            },
+        }},
+        .list => .{ .list = .{} },
+        .summary => .{ .summary = .{
+            .positional = .{
+                .month = args_it.next() orelse util.fatal("TODO", .{}),
+                .year = args_it.next() orelse util.fatal("TODO", .{}),
+            },
+        }},
+        .csv => .{ .csv = .{
+            .positional = .{
+                .month = args_it.next() orelse util.fatal("TODO", .{}),
+                .year = args_it.next() orelse util.fatal("TODO", .{}),
+                .user_name = args_it.next() orelse util.fatal("TODO", .{}),
+            },
+        }},
+        .version => .{ .version = .{} },
+    }};
+}
+
+command: Command,
+
+const Command = union(enum) {
     pub const descriptions = .{
         .init = "Creates a fresh session file in the working directory.",
         .start = "Starts the trecker.",
@@ -40,4 +78,4 @@ command: union(enum) {
         },
     },
     version: struct {},
-},
+};
