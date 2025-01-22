@@ -3,14 +3,16 @@ const util = @import("util.zig");
 const Args = @This();
 
 pub fn parseOrExit(args_it: *std.process.ArgIterator) Args {
+    const usage_message = std.fmt.comptimePrint("Usage: {s} <command> [args...]\nCommands:\n{s}", .{util.exe_name, command_list});
+
     _ = args_it.skip();
     const command_name = args_it.next() orelse {
-        util.fatal("Usage: {s} <command> [args...]\nCommands:\n{s}", .{util.exe_name, command_list});
+        util.fatal(usage_message, .{});
     };
     const command_enum = std.meta.stringToEnum(std.meta.FieldEnum(Command), command_name) orelse {
-        util.fatal("Unknown command: {s}\nKnown commands: {s}", .{
+        util.fatal("Unknown command: {s}\n{s}", .{
             command_name,
-            command_names,
+            usage_message,
         });
     };
 
@@ -41,32 +43,32 @@ fn getPositionalArg(args_it: *std.process.ArgIterator, name: []const u8) []const
     return args_it.next() orelse util.fatal("Missing positional argument: {s}", .{name});
 }
 
-const command_names = blk: {
-    var result: []const u8 = "";
-    for (std.meta.fields(Command)) |field| {
-        if (result.len == 0) {
-            result = field.name;
-        } else {
-            result = std.fmt.comptimePrint("{s}, {s}", .{result, field.name});
-        }
-    }
-    break :blk result;
-};
-
 const command_list = command_list_blk: {
     const indent: []const u8 = "  ";
     var result: []const u8 = "";
 
-    const max_len = max_len_blk: {
-        var max_len_result = 0;
+    const max_field_name_len = max_field_name_len_blk: {
+        var max_field_name_len_result = 0;
         for (std.meta.fields(Command)) |field| {
-            max_len_result = @max(max_len_result, field.name.len);
+            max_field_name_len_result = @max(max_field_name_len_result, field.name.len);
         }
-        break :max_len_blk max_len_result;
+        break :max_field_name_len_blk max_field_name_len_result;
+    };
+
+    const max_args_list_len = max_args_list_len_blk: {
+        var max_args_list_len_result = 0;
+        for (std.meta.fields(Command)) |field| {
+            var args_list_len = 0;
+            for (std.meta.fields(field.type)) |arg| {
+                args_list_len += std.fmt.comptimePrint(" <{s}>", .{arg.name}).len;
+            }
+            max_args_list_len_result = @max(max_args_list_len_result, args_list_len);
+        }
+        break :max_args_list_len_blk max_args_list_len_result;
     };
 
     for (std.meta.fields(Command)) |field| {
-        const name_format = std.fmt.comptimePrint("{{s:<{d}}}", .{max_len});
+        const name_format = std.fmt.comptimePrint("{{s:<{d}}}", .{max_field_name_len});
         const field_name = indent ++ std.fmt.comptimePrint(name_format, .{field.name});
 
         if (result.len == 0) {
@@ -75,26 +77,34 @@ const command_list = command_list_blk: {
             result = result ++ "\n" ++ field_name;
         }
 
+        var args_list: []const u8 = "";
         for (std.meta.fields(field.type)) |arg| {
-            result = result ++ std.fmt.comptimePrint(" <{s}>", .{arg.name});
+            args_list = args_list ++ std.fmt.comptimePrint(" <{s}>", .{arg.name});
         }
+        const args_list_format = std.fmt.comptimePrint("{{s:<{d}}}", .{max_args_list_len});
+        result = result ++ std.fmt.comptimePrint(args_list_format, .{args_list});
+
+        const command_value = std.meta.stringToEnum(std.meta.FieldEnum(Command), field.name).?;
+        result = result ++ " " ++ getDescription(command_value);
     }
     break :command_list_blk result;
 };
 
+fn getDescription(command: std.meta.FieldEnum(Command)) []const u8 {
+    return switch (command) {
+        .init => "Creates a fresh session file in the working directory.",
+        .start => "Starts the trecker.",
+        .add => "Adds a new project.",
+        .list => "Lists all known projects.",
+        .summary => "Prints the work summary for one specific month.",
+        .csv => "Prints the work summary for one specific month in csv format.",
+        .version => std.fmt.comptimePrint("Prints info about the version of {s}.", .{util.exe_name}),
+    };
+}
+
 command: Command,
 
 const Command = union(enum) {
-    pub const descriptions = .{
-        .init = "Creates a fresh session file in the working directory.",
-        .start = "Starts the trecker.",
-        .add = "Adds a new project.",
-        .list = "Lists all known projects.",
-        .summary = "Prints the work summary for one specific month.",
-        .csv = "Prints the work summary for one specific month in csv format.",
-        .version = "Prints info about the version of " ++ util.exe_name,
-    };
-
     init: struct {},
     start: struct {
         project_id: []const u8,
