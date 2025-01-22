@@ -13,11 +13,11 @@ pub fn main() !void {
     const parsed_args = Args.parseOrExit(&args_it);
     try switch (parsed_args.command) {
         .init => commands.init(allocator),
-        .start => |sub_args| commands.start(allocator, sub_args.positional.project_id),
-        .add => |sub_args| commands.add(allocator, sub_args.positional.project_id, sub_args.positional.project_name),
+        .start => |sub_args| commands.start(allocator, sub_args.project_id),
+        .add => |sub_args| commands.add(allocator, sub_args.project_id, sub_args.project_name),
         .list => commands.list(allocator),
-        .summary => |sub_args| commands.text_summary(allocator, sub_args.positional.month, sub_args.positional.year),
-        .csv => |sub_args| commands.csv_summary(allocator, sub_args.positional.month, sub_args.positional.year, sub_args.positional.user_name),
+        .summary => |sub_args| commands.text_summary(allocator, sub_args.month, sub_args.year),
+        .csv => |sub_args| commands.csv_summary(allocator, sub_args.month, sub_args.year, sub_args.user_name),
         .version => commands.version(),
     };
 }
