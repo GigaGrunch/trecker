@@ -16,24 +16,29 @@ pub fn parseOrExit(args_it: *std.process.ArgIterator) Args {
         });
     };
 
+    defer {
+        const args_list = args_lists.get(command_name).?;
+        if (args_it.skip()) util.fatal("Too many positional arguments.\nUsage: {s} {s}", .{command_name, args_list});
+    }
+
     return .{ .command = switch (command_enum) {
         .init => .{ .init = .{} },
         .start => .{ .start = .{
-            .project_id = getPositionalArg(.start, args_it, "project_id"),
+            .project_id = getPositionalArg(command_enum, args_it, "project_id"),
         }},
         .add => .{ .add = .{
-            .project_id = getPositionalArg(.add, args_it, "project_id"),
-            .project_name = getPositionalArg(.add, args_it, "project_name"),
+            .project_id = getPositionalArg(command_enum, args_it, "project_id"),
+            .project_name = getPositionalArg(command_enum, args_it, "project_name"),
         }},
         .list => .{ .list = .{} },
         .summary => .{ .summary = .{
-            .month = getPositionalArg(.summary, args_it, "month"),
-            .year = getPositionalArg(.summary, args_it, "year"),
+            .month = getPositionalArg(command_enum, args_it, "month"),
+            .year = getPositionalArg(command_enum, args_it, "year"),
         }},
         .csv => .{ .csv = .{
-            .month = getPositionalArg(.csv, args_it, "month"),
-            .year = getPositionalArg(.csv, args_it, "year"),
-            .user_name = getPositionalArg(.csv, args_it, "user_name"),
+            .month = getPositionalArg(command_enum, args_it, "month"),
+            .year = getPositionalArg(command_enum, args_it, "year"),
+            .user_name = getPositionalArg(command_enum, args_it, "user_name"),
         }},
         .version => .{ .version = .{} },
     }};
