@@ -19,28 +19,30 @@ pub fn parseOrExit(args_it: *std.process.ArgIterator) Args {
     return .{ .command = switch (command_enum) {
         .init => .{ .init = .{} },
         .start => .{ .start = .{
-            .project_id = getPositionalArg(args_it, "project_id"),
+            .project_id = getPositionalArg(.start, args_it, "project_id"),
         }},
         .add => .{ .add = .{
-            .project_id = getPositionalArg(args_it, "project_id"),
-            .project_name = getPositionalArg(args_it, "project_name"),
+            .project_id = getPositionalArg(.add, args_it, "project_id"),
+            .project_name = getPositionalArg(.add, args_it, "project_name"),
         }},
         .list => .{ .list = .{} },
         .summary => .{ .summary = .{
-            .month = getPositionalArg(args_it, "month"),
-            .year = getPositionalArg(args_it, "year"),
+            .month = getPositionalArg(.summary, args_it, "month"),
+            .year = getPositionalArg(.summary, args_it, "year"),
         }},
         .csv => .{ .csv = .{
-            .month = getPositionalArg(args_it, "month"),
-            .year = getPositionalArg(args_it, "year"),
-            .user_name = getPositionalArg(args_it, "user_name"),
+            .month = getPositionalArg(.csv, args_it, "month"),
+            .year = getPositionalArg(.csv, args_it, "year"),
+            .user_name = getPositionalArg(.csv, args_it, "user_name"),
         }},
         .version => .{ .version = .{} },
     }};
 }
 
-fn getPositionalArg(args_it: *std.process.ArgIterator, name: []const u8) []const u8 {
-    return args_it.next() orelse util.fatal("Missing positional argument: {s}", .{name});
+fn getPositionalArg(command: std.meta.FieldEnum(Command), args_it: *std.process.ArgIterator, name: []const u8) []const u8 {
+    const command_name = @tagName(command);
+    const args_list = args_lists.get(command_name).?;
+    return args_it.next() orelse util.fatal("Missing positional argument: {s}\nUsage: {s} {s}", .{name, command_name, args_list});
 }
 
 const command_list = command_list_blk: {
@@ -57,12 +59,8 @@ const command_list = command_list_blk: {
 
     const max_args_list_len = max_args_list_len_blk: {
         var max_args_list_len_result = 0;
-        for (std.meta.fields(Command)) |field| {
-            var args_list_len = 0;
-            for (std.meta.fields(field.type)) |arg| {
-                args_list_len += std.fmt.comptimePrint(" <{s}>", .{arg.name}).len;
-            }
-            max_args_list_len_result = @max(max_args_list_len_result, args_list_len);
+        for (args_lists.values()) |value| {
+            max_args_list_len_result = @max(max_args_list_len_result, value.len);
         }
         break :max_args_list_len_blk max_args_list_len_result;
     };
@@ -77,17 +75,30 @@ const command_list = command_list_blk: {
             result = result ++ "\n" ++ field_name;
         }
 
-        var args_list: []const u8 = "";
-        for (std.meta.fields(field.type)) |arg| {
-            args_list = args_list ++ std.fmt.comptimePrint(" <{s}>", .{arg.name});
-        }
-        const args_list_format = std.fmt.comptimePrint("{{s:<{d}}}", .{max_args_list_len});
+        const args_list = args_lists.get(field.name).?;
+        const args_list_format = std.fmt.comptimePrint(" {{s:<{d}}}", .{max_args_list_len});
         result = result ++ std.fmt.comptimePrint(args_list_format, .{args_list});
 
         const command_value = std.meta.stringToEnum(std.meta.FieldEnum(Command), field.name).?;
         result = result ++ " " ++ getDescription(command_value);
     }
     break :command_list_blk result;
+};
+
+const args_lists = args_lists_blk: {
+    const fields = std.meta.fields(Command);
+    var kvs: [fields.len] struct { []const u8, []const u8 } = undefined;
+    for (fields, 0..) |field, field_i| {
+        const key = &kvs[field_i][0];
+        const value = &kvs[field_i][1];
+        key.* = field.name;
+        value.* = "";
+        for (std.meta.fields(field.type), 0..) |arg, arg_i| {
+            if (arg_i > 0) value.* = value.* ++ " ";
+            value.* = value.* ++ std.fmt.comptimePrint("<{s}>", .{arg.name});
+        }
+    }
+    break :args_lists_blk std.StaticStringMap([]const u8).initComptime(kvs);
 };
 
 fn getDescription(command: std.meta.FieldEnum(Command)) []const u8 {
