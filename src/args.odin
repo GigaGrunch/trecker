@@ -40,9 +40,21 @@ Csv_Args :: struct {
     user_name: string,
 }
 
+print_usage :: proc() {
+    fmt.println("Usage: odin <command> [<args>]")
+    fmt.println("Commands:")
+    fmt.println("    init                                  Initialize './trecker_session.ini'. This is the first command you will have to use.")
+    fmt.println("    add     <project_id> <project_name>   Add a new project to the list.")
+    fmt.println("    start   <project_id>                  Start tracking time for the given project.")
+    fmt.println("    list                                  List all known projects.")
+    fmt.println("    summary <month> <year>                Print work summary in human readable format.")
+    fmt.println("    csv     <month> <year> <user_name>    Print work summary in CSV format specific to how my employer needs it.")
+}
+
 parse_args :: proc(raw_args: []string) -> (Args, bool) {
     if len(raw_args) < 1 {
         fmt.println("No args were passed.")
+        print_usage()
         return {}, false
     }
 
@@ -54,10 +66,12 @@ parse_args :: proc(raw_args: []string) -> (Args, bool) {
     if strings.compare(command_str, "add") == 0 {
         if len(raw_args) < 2 {
             fmt.println("Missing argument: project_id")
+            print_usage()
             return {}, false
         }
         if len(raw_args) < 3 {
             fmt.println("Missing argument: project_name")
+            print_usage()
             return {}, false
         }
         
@@ -72,6 +86,7 @@ parse_args :: proc(raw_args: []string) -> (Args, bool) {
     if strings.compare(command_str, "start") == 0 {
         if len(raw_args) < 2 {
             fmt.println("Missing argument: project_id")
+            print_usage()
             return {}, false
         }
         
@@ -86,10 +101,12 @@ parse_args :: proc(raw_args: []string) -> (Args, bool) {
     if strings.compare(command_str, "summary") == 0 {
         if len(raw_args) < 2 {
             fmt.println("Missing argument: month")
+            print_usage()
             return {}, false
         }
         if len(raw_args) < 3 {
             fmt.println("Missing argument: year")
+            print_usage()
             return {}, false
         }
         
@@ -104,14 +121,17 @@ parse_args :: proc(raw_args: []string) -> (Args, bool) {
     if strings.compare(command_str, "csv") == 0 {
         if len(raw_args) < 2 {
             fmt.println("Missing argument: month")
+            print_usage()
             return {}, false
         }
         if len(raw_args) < 3 {
             fmt.println("Missing argument: year")
+            print_usage()
             return {}, false
         }
         if len(raw_args) < 4 {
             fmt.println("Missing argument: user_name")
+            print_usage()
             return {}, false
         }
         
@@ -126,5 +146,6 @@ parse_args :: proc(raw_args: []string) -> (Args, bool) {
     }
 
     fmt.printfln("Unknown command: '%v'.", command_str)
+    print_usage()
     return {}, false
 }
