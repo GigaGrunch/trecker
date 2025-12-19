@@ -61,15 +61,25 @@ command_gui :: proc() {
         rl.BeginDrawing()
         rl.ClearBackground(rl.BLACK)
 
-        project_rect := rl.Rectangle {
-            x = 10 * scale_factor,
-            y = 10 * scale_factor,
-            width = 400 * scale_factor,
-            height = font_size * 1.2,
-        }
+        padding := 10 * scale_factor
+        project_y := padding
+
         for project in store.projects {
-            rl.GuiLabel(project_rect, fmt.ctprint(project.name))
-            project_rect.y += project_rect.height
+            rect := rl.Rectangle {
+                x = padding,
+                y = project_y,
+                width = 400,
+                height = font_size,
+            }
+            rl.GuiLabel(rect, fmt.ctprint(project.name))
+
+            rect.x += rect.width + padding
+            duration := get_today_duration(store, project)
+            duration_buf: [len("00:00:00")]u8
+            duration_str := time.duration_to_string_hms(duration, duration_buf[:])
+            rl.GuiLabel(rect, fmt.ctprintf("%v", duration_str))
+
+            project_y += rect.height + padding
         }
 
         rl.EndDrawing()
@@ -122,14 +132,10 @@ command_start :: proc(args: Start_Args) {
         fmt.printfln("Project with id '%v' does not exist.", args.project_id)
         os.exit(1)
     }
-    
-    start_year, start_month, start_day := time.date(time.now())    
+
     initial_today_duration: time.Duration
-    for other in store.entries {
-        other_year, other_month, other_day := time.date(other.start)
-        if start_year == other_year && start_month == other_month && start_day == other_day {
-            initial_today_duration += time.diff(other.start, other.end)
-        }
+    for p in store.projects {
+        initial_today_duration += get_today_duration(store, p)
     }
     
     entry := store_add_entry(&store, args.project_id, time.now(), time.now())
@@ -295,6 +301,19 @@ command_csv :: proc(args: Csv_Args) {
         
         fmt.printfln("%v,%v,%v%%", args.user_name, project_name, summary.sorted_percentages[i])
     }
+}
+
+get_today_duration :: proc(store: Store, project: Project) -> (today_duration: time.Duration) {
+    year, month, day := time.date(time.now())    
+    for entry in store.entries {
+        if strings.compare(entry.project_id, project.id) == 0 {
+            other_year, other_month, other_day := time.date(entry.start)
+            if year == other_year && month == other_month && day == other_day {
+                today_duration += time.diff(entry.start, entry.end)
+            }
+        }
+    }
+    return
 }
 
 read_store_file :: proc() -> (Store, bool) {
