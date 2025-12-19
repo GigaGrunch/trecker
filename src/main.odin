@@ -10,6 +10,7 @@ import "core:mem"
 import "core:sort"
 import "core:slice"
 import "core:c/libc"
+import rl "vendor:raylib"
 
 got_interrupt_signal := false
 
@@ -29,17 +30,22 @@ main :: proc() {
     args, args_ok := parse_args(os.args[1:])
     if !args_ok do os.exit(1)
     
-    switch args.type {
-    case .init: command_init()
-    case .add: command_add(args.inner.(Add_Args))
-    case .start: command_start(args.inner.(Start_Args))
-    case .list: command_list()
-    case .summary: command_summary(args.inner.(Summary_Args))
-    case .csv: command_csv(args.inner.(Csv_Args))
+    switch args.command {
+        case .init: command_init()
+        case .add: command_add(args.inner.(Add_Args))
+        case .start: command_start(args.inner.(Start_Args))
+        case .list: command_list()
+        case .summary: command_summary(args.inner.(Summary_Args))
+        case .csv: command_csv(args.inner.(Csv_Args))
+        case .gui: command_gui()
     }
 }
 
 session_file_path :: "trecker_session.ini"
+
+command_gui :: proc() {
+
+}
 
 command_init :: proc() {
     if os.exists(session_file_path) {
