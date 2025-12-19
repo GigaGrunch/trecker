@@ -20,7 +20,7 @@ handle_interrupt_signal :: proc "c" (_: i32) {
 }
 
 main :: proc() {
-    libc.signal(libc.SIGINT, handle_interrupt_signal)
+    // libc.signal(libc.SIGINT, handle_interrupt_signal)
 
     track: mem.Tracking_Allocator
     mem.tracking_allocator_init(&track, context.allocator)
@@ -44,7 +44,37 @@ main :: proc() {
 session_file_path :: "trecker_session.ini"
 
 command_gui :: proc() {
+    store, store_ok := read_store_file()
+    defer store_destroy(&store)
+    if !store_ok do os.exit(1)
 
+    rl.InitWindow(1280, 720, "trecker")
+    rl.SetTargetFPS(60)
+
+    scale_factor := rl.GetWindowScaleDPI().x
+    font_size := 24 * scale_factor
+    font := rl.LoadFontEx("RobotoCondensed-Regular.ttf", i32(font_size), nil, 0)
+    rl.GuiSetStyle(.DEFAULT, i32(rl.GuiDefaultProperty.TEXT_SIZE), i32(font_size))
+    rl.GuiSetFont(font)
+
+    for !rl.WindowShouldClose() {
+        rl.BeginDrawing()
+        rl.ClearBackground(rl.BLACK)
+
+        project_rect := rl.Rectangle {
+            x = 10 * scale_factor,
+            y = 10 * scale_factor,
+            width = 400 * scale_factor,
+            height = font_size * 1.2,
+        }
+        for project in store.projects {
+            rl.GuiLabel(project_rect, fmt.ctprint(project.name))
+            project_rect.y += project_rect.height
+        }
+
+        rl.EndDrawing()
+        free_all(context.temp_allocator)
+    }
 }
 
 command_init :: proc() {
