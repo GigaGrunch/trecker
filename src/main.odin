@@ -57,31 +57,56 @@ command_gui :: proc() {
     rl.GuiSetStyle(.DEFAULT, i32(rl.GuiDefaultProperty.TEXT_SIZE), i32(font_size))
     rl.GuiSetFont(font)
 
+    scroll_value := f32(0)
+    scroll_content_size := rl.Vector2 { 1, 1 }
+
     for !rl.WindowShouldClose() {
+        scroll_value += rl.GetMouseWheelMove() * 20
+        scroll_value = clamp(scroll_value, f32(rl.GetScreenHeight()) - scroll_content_size.y, 0)
+
+        scroll_render_target := rl.LoadRenderTexture(i32(scroll_content_size.x), i32(scroll_content_size.y))
+        defer rl.UnloadRenderTexture(scroll_render_target)
+        scroll_content_size.x = f32(rl.GetScreenWidth())
+        scroll_content_size.y = 0
+
         rl.BeginDrawing()
         rl.ClearBackground(rl.BLACK)
+        {
+            rl.BeginTextureMode(scroll_render_target)
+            {
+                padding := 10 * scale_factor
+                project_y := padding
 
-        padding := 10 * scale_factor
-        project_y := padding
+                for project in store.projects {
+                    rect := rl.Rectangle {
+                        x = padding,
+                        y = project_y,
+                        width = 400,
+                        height = font_size,
+                    }
+                    rl.GuiLabel(rect, fmt.ctprint(project.name))
 
-        for project in store.projects {
-            rect := rl.Rectangle {
-                x = padding,
-                y = project_y,
-                width = 400,
-                height = font_size,
+                    rect.x += rect.width + padding
+                    duration := get_today_duration(store, project)
+                    duration_buf: [len("00:00:00")]u8
+                    duration_str := time.duration_to_string_hms(duration, duration_buf[:])
+                    rl.GuiLabel(rect, fmt.ctprintf("%v", duration_str))
+
+                    project_y += rect.height + padding
+                }
+
+                scroll_content_size.y = project_y
             }
-            rl.GuiLabel(rect, fmt.ctprint(project.name))
+            rl.EndTextureMode()
 
-            rect.x += rect.width + padding
-            duration := get_today_duration(store, project)
-            duration_buf: [len("00:00:00")]u8
-            duration_str := time.duration_to_string_hms(duration, duration_buf[:])
-            rl.GuiLabel(rect, fmt.ctprintf("%v", duration_str))
-
-            project_y += rect.height + padding
+            // texture has to be flipped for some reason
+            rl.DrawTexturePro(scroll_render_target.texture,
+                source = rl.Rectangle { width=scroll_content_size.x, height=-scroll_content_size.y },
+                dest = rl.Rectangle { y=scroll_value, width=scroll_content_size.x, height=scroll_content_size.y },
+                origin = {},
+                rotation = 0,
+                tint = rl.WHITE)
         }
-
         rl.EndDrawing()
         free_all(context.temp_allocator)
     }
