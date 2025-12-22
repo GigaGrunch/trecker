@@ -63,9 +63,13 @@ command_gui :: proc() {
     scroll_content_size := rl.Vector2 { 1, 1 }
     project_names_width := f32(0)
     durations_width := f32(0)
-    current_project_id: string
+    current_entry: ^Entry
 
     for !rl.WindowShouldClose() {
+        if current_entry != nil {
+            current_entry.end = time.now()
+        }
+
         scroll_value += rl.GetMouseWheelMove() * 20
         scroll_value = clamp(scroll_value, f32(rl.GetScreenHeight()) - scroll_content_size.y, 0)
 
@@ -75,10 +79,10 @@ command_gui :: proc() {
         scroll_content_size.y = 0
 
         rl.BeginDrawing()
-        rl.ClearBackground(rl.BLACK)
         {
             rl.BeginTextureMode(scroll_render_target)
             {
+                rl.ClearBackground(rl.BLACK)
                 padding := 10 * scale_factor
                 project_y := padding
 
@@ -103,15 +107,15 @@ command_gui :: proc() {
 
                     rect.x += rect.width + padding
                     rect.width = 30 * scale_factor
-                    if strings.compare(current_project_id, project.id) == 0 {
+                    if current_entry != nil && strings.compare(current_entry.project_id, project.id) == 0 {
                         stop_icon := rl.GuiIconName.ICON_PLAYER_STOP
                         if rl.GuiButton(rect, fmt.ctprintf("#%d#", stop_icon)) {
-                            current_project_id = ""
+                            current_entry = nil
                         }
                     } else {
                         play_icon := rl.GuiIconName.ICON_PLAYER_PLAY
                         if rl.GuiButton(rect, fmt.ctprintf("#%d#", play_icon)) {
-                            current_project_id = project.id
+                            current_entry = store_add_entry(&store, project.id, time.now(), time.now())
                         }
                     }
 
