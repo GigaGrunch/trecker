@@ -63,6 +63,7 @@ command_gui :: proc() {
     scroll_content_size := rl.Vector2 { 1, 1 }
     project_names_width := f32(0)
     durations_width := f32(0)
+    current_project_id: string
 
     for !rl.WindowShouldClose() {
         scroll_value += rl.GetMouseWheelMove() * 20
@@ -100,10 +101,19 @@ command_gui :: proc() {
                     rect.width = durations_width
                     rl.GuiLabel(rect, duration_str)
 
-                    play_icon_str := fmt.ctprintf("#%d#", rl.GuiIconName.ICON_ARROW_RIGHT_FILL)
                     rect.x += rect.width + padding
                     rect.width = 30 * scale_factor
-                    rl.GuiButton(rect, play_icon_str)
+                    if strings.compare(current_project_id, project.id) == 0 {
+                        stop_icon := rl.GuiIconName.ICON_PLAYER_STOP
+                        if rl.GuiButton(rect, fmt.ctprintf("#%d#", stop_icon)) {
+                            current_project_id = ""
+                        }
+                    } else {
+                        play_icon := rl.GuiIconName.ICON_PLAYER_PLAY
+                        if rl.GuiButton(rect, fmt.ctprintf("#%d#", play_icon)) {
+                            current_project_id = project.id
+                        }
+                    }
 
                     project_y += rect.height + padding
                 }
