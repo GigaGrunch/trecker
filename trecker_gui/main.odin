@@ -25,7 +25,7 @@ main :: proc() {
     scale_factor := rl.GetWindowScaleDPI().x
     font_size := 24 * scale_factor
     font := rl.LoadFontEx("RobotoCondensed-Regular.ttf", i32(font_size), nil, 0)
-    rl.GuiSetStyle(.DEFAULT, i32(rl.GuiDefaultProperty.TEXT_SIZE), i32(font_size))
+    rl.GuiSetStyle(nil, i32(rl.GuiDefaultProperty.TEXT_SIZE), i32(font_size))
     rl.GuiSetFont(font)
 
     scroll_value := f32(0)
@@ -68,6 +68,13 @@ main :: proc() {
                     rect.x = padding
                     rect.y = project_y
                     rect.height = font_size
+
+                    row_background_rect := rl.Rectangle {
+                        y = rect.y - padding / 2,
+                        width = scroll_content_size.x,
+                        height = rect.height + padding,
+                    }
+                    rl.GuiGroupBox(row_background_rect, nil)
 
                     project_name := fmt.ctprintf("%v [%v]", project.name, project.id)
                     project_names_width = max(project_names_width, rl.MeasureTextEx(font, project_name, font_size, 1).x)
