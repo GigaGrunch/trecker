@@ -10,7 +10,15 @@ import "core:mem"
 import "core:sort"
 import "core:slice"
 import "core:c/libc"
+import "core:c"
 import rl "vendor:raylib"
+
+foreign import user32 "system:user32.lib"
+WIN32_BOOL :: c.int;
+WIN32_HWND :: rawptr
+foreign user32 {
+    FlashWindow :: proc "stdcall" (hWnd: WIN32_HWND, bInvert: WIN32_BOOL) -> WIN32_BOOL ---
+}
 
 got_interrupt_signal := false
 
@@ -66,7 +74,9 @@ command_gui :: proc() {
     current_entry: Entry
 
     for !rl.WindowShouldClose() {
-        if current_entry != {} {
+        if current_entry == {} {
+            FlashWindow(rl.GetWindowHandle(), 0)
+        } else {
             current_entry.end = time.now()
             current_duration := time.since(current_entry.start)
             current_minutes := time.duration_minutes(current_duration)
