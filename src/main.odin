@@ -100,6 +100,11 @@ command_gui :: proc() {
                     rect.width = durations_width
                     rl.GuiLabel(rect, duration_str)
 
+                    play_icon_str := fmt.ctprintf("#%d#", rl.GuiIconName.ICON_ARROW_RIGHT_FILL)
+                    rect.x += rect.width + padding
+                    rect.width = 30 * scale_factor
+                    rl.GuiButton(rect, play_icon_str)
+
                     project_y += rect.height + padding
                 }
 
