@@ -119,6 +119,16 @@ main :: proc() {
                 origin = {},
                 rotation = 0,
                 tint = rl.WHITE)
+
+            relative_scroll_bar_height := f32(rl.GetScreenHeight()) / scroll_content_size.y
+            if relative_scroll_bar_height < 1 {
+                scroll_bar: rl.Rectangle
+                scroll_bar.width = 10 * scale_factor
+                scroll_bar.height = f32(rl.GetScreenHeight()) * relative_scroll_bar_height
+                scroll_bar.x = f32(rl.GetScreenWidth()) - scroll_bar.width
+                scroll_bar.y = -scroll_value
+                rl.DrawRectangleRec(scroll_bar, rl.WHITE)
+            }
         }
         rl.EndDrawing()
     }
