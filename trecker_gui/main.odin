@@ -3,8 +3,16 @@ package trecker_gui
 import "core:fmt"
 import "core:strings"
 import "core:time"
+import "core:c"
 import rl "vendor:raylib"
 import tl "../trecker_lib"
+
+foreign import user32 "system:user32.lib"
+WIN32_BOOL :: c.int;
+WIN32_HWND :: rawptr
+foreign user32 {
+    FlashWindow :: proc "stdcall" (hWnd: WIN32_HWND, bInvert: WIN32_BOOL) -> WIN32_BOOL ---
+}
 
 main :: proc() {
     initial_store, initial_store_ok := tl.read_store_file()
@@ -34,7 +42,9 @@ main :: proc() {
     current_entry: ^tl.Entry
 
     for !rl.WindowShouldClose() {
-        if current_entry != nil {
+        if current_entry == nil {
+            FlashWindow(rl.GetWindowHandle(), 0)
+        } else {
             current_entry.end = time.now()
         }
 
