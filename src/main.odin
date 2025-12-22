@@ -48,8 +48,10 @@ command_gui :: proc() {
     defer store_destroy(&store)
     if !store_ok do os.exit(1)
 
-    rl.InitWindow(1280, 720, "trecker")
+    rl.SetTraceLogLevel(.WARNING)
+    rl.SetConfigFlags({ .WINDOW_RESIZABLE })
     rl.SetTargetFPS(60)
+    rl.InitWindow(1280, 720, "trecker")
 
     scale_factor := rl.GetWindowScaleDPI().x
     font_size := 24 * scale_factor
