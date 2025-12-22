@@ -40,9 +40,7 @@ main :: proc() {
             FlashWindow(rl.GetWindowHandle(), 0)
         } else {
             current_entry.end = time.now()
-            current_minutes := time.duration_minutes(time.since(current_entry.start))
-            since_last_serialized := time.duration_minutes(time.since(last_serialized))
-            if current_minutes > 1 && since_last_serialized > 1 {
+            if time.duration_minutes(time.since(last_serialized)) > 1 {
                 tl.write_store_file(store)
                 last_serialized = time.now()
             }

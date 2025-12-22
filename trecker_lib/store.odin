@@ -77,9 +77,6 @@ store_serialize :: proc(store: Store) -> []u8 {
     strings.write_string(&builder, "\n")
     
     for entry in store.entries {
-        strings.write_string(&builder, "entry: ")
-        strings.write_string(&builder, entry.project_id)
-        strings.write_string(&builder, " ")
         start_str, start_ok := time.time_to_rfc3339(entry.start)
         end_str, end_ok := time.time_to_rfc3339(entry.end)
         defer {
@@ -91,10 +88,15 @@ store_serialize :: proc(store: Store) -> []u8 {
             os.exit(1)
         }
         
-        strings.write_string(&builder, start_str[:len(TIME_FORMAT)])
-        strings.write_string(&builder, "..")
-        strings.write_string(&builder, end_str[:len(TIME_FORMAT)])
-        strings.write_string(&builder, "\n")
+        if time.duration_minutes(time.diff(entry.start, entry.end)) > 1 {
+            strings.write_string(&builder, "entry: ")
+            strings.write_string(&builder, entry.project_id)
+            strings.write_string(&builder, " ")
+            strings.write_string(&builder, start_str[:len(TIME_FORMAT)])
+            strings.write_string(&builder, "..")
+            strings.write_string(&builder, end_str[:len(TIME_FORMAT)])
+            strings.write_string(&builder, "\n")
+        }
     }
     
     return builder.buf[:]
