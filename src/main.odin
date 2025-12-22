@@ -63,11 +63,32 @@ command_gui :: proc() {
     scroll_content_size := rl.Vector2 { 1, 1 }
     project_names_width := f32(0)
     durations_width := f32(0)
-    current_entry: ^Entry
+    current_entry: Entry
 
     for !rl.WindowShouldClose() {
-        if current_entry != nil {
+        if current_entry != {} {
             current_entry.end = time.now()
+            current_duration := time.since(current_entry.start)
+            current_minutes := time.duration_minutes(current_duration)
+            if current_minutes > 1 {
+                store_entry: ^Entry
+                if len(store.entries) > 0 {
+                    last_entry := &store.entries[len(store.entries) - 1]
+                    if strings.compare(last_entry.project_id, current_entry.project_id) == 0 && last_entry.start == current_entry.start {
+                        store_entry = last_entry
+                    }
+                }
+                if store_entry == nil {
+                    store_entry = store_add_entry(&store, current_entry.project_id, current_entry.start, current_entry.start)
+                }
+                time_since_store := time.since(store_entry.end)
+                minutes_since_store := time.duration_minutes(time_since_store)
+                if minutes_since_store > 1 {
+                    store_entry.end = current_entry.end
+                    current_entry.start = current_entry.end
+                    write_store_file(store)
+                }
+            }
         }
 
         scroll_value += rl.GetMouseWheelMove() * 20
@@ -98,6 +119,10 @@ command_gui :: proc() {
                     rl.GuiLabel(rect, project_name)
 
                     duration := get_today_duration(store, project)
+                    if strings.compare(current_entry.project_id, project.id) == 0 {
+                        duration += time.since(current_entry.start)
+                    }
+
                     duration_buf: [len("00:00:00")]u8
                     duration_str := fmt.ctprint(time.duration_to_string_hms(duration, duration_buf[:]))
                     durations_width = max(durations_width, rl.MeasureTextEx(font, duration_str, font_size, 1).x)
@@ -107,15 +132,19 @@ command_gui :: proc() {
 
                     rect.x += rect.width + padding
                     rect.width = 30 * scale_factor
-                    if current_entry != nil && strings.compare(current_entry.project_id, project.id) == 0 {
+                    if strings.compare(current_entry.project_id, project.id) == 0 {
                         stop_icon := rl.GuiIconName.ICON_PLAYER_STOP
                         if rl.GuiButton(rect, fmt.ctprintf("#%d#", stop_icon)) {
-                            current_entry = nil
+                            current_entry = {}
                         }
                     } else {
                         play_icon := rl.GuiIconName.ICON_PLAYER_PLAY
                         if rl.GuiButton(rect, fmt.ctprintf("#%d#", play_icon)) {
-                            current_entry = store_add_entry(&store, project.id, time.now(), time.now())
+                            current_entry = Entry {
+                                project_id = project.id,
+                                start = time.now(),
+                                end = time.now(),
+                            }
                         }
                     }
 
