@@ -12,6 +12,9 @@ main :: proc() {
     for project in initial_store.projects {
         tl.store_add_project(&store, project.id, project.name)
     }
+    for entry in initial_store.entries {
+        tl.store_add_entry(&store, entry.project_id, entry.start, entry.end)
+    }
 
     rl.SetTraceLogLevel(.WARNING)
     rl.SetConfigFlags({ .WINDOW_RESIZABLE })
@@ -28,9 +31,13 @@ main :: proc() {
     scroll_content_size := rl.Vector2 { 1, 1 }
     project_names_width := f32(0)
     durations_width := f32(0)
-    current_entry: tl.Entry
+    current_entry: ^tl.Entry
 
     for !rl.WindowShouldClose() {
+        if current_entry != nil {
+            current_entry.end = time.now()
+        }
+
         scroll_render_target := rl.LoadRenderTexture(i32(scroll_content_size.x), i32(scroll_content_size.y))
         defer rl.UnloadRenderTexture(scroll_render_target)
 
@@ -60,10 +67,6 @@ main :: proc() {
                     rl.GuiLabel(rect, project_name)
 
                     duration := tl.get_today_duration(store, project)
-                    if strings.compare(current_entry.project_id, project.id) == 0 {
-                        duration += time.since(current_entry.start)
-                    }
-
                     duration_buf: [len("00:00:00")]u8
                     duration_str := fmt.ctprint(time.duration_to_string_hms(duration, duration_buf[:]))
                     durations_width = max(durations_width, rl.MeasureTextEx(font, duration_str, font_size, 1).x)
@@ -73,19 +76,15 @@ main :: proc() {
 
                     rect.x += rect.width + padding
                     rect.width = 30 * scale_factor
-                    if strings.compare(current_entry.project_id, project.id) == 0 {
+                    if current_entry != nil && strings.compare(current_entry.project_id, project.id) == 0 {
                         stop_icon := rl.GuiIconName.ICON_PLAYER_STOP
                         if rl.GuiButton(rect, fmt.ctprintf("#%d#", stop_icon)) {
-                            current_entry = {}
+                            current_entry = nil
                         }
                     } else {
                         play_icon := rl.GuiIconName.ICON_PLAYER_PLAY
                         if rl.GuiButton(rect, fmt.ctprintf("#%d#", play_icon)) {
-                            current_entry = tl.Entry {
-                                project_id = project.id,
-                                start = time.now(),
-                                end = time.now(),
-                            }
+                            current_entry = tl.store_add_entry(&store, project.id, time.now(), time.now())
                         }
                     }
 
