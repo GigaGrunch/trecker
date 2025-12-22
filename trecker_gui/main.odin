@@ -15,14 +15,7 @@ foreign user32 {
 }
 
 main :: proc() {
-    initial_store, initial_store_ok := tl.read_store_file()
-    store: tl.Store
-    for project in initial_store.projects {
-        tl.store_add_project(&store, project.id, project.name)
-    }
-    for entry in initial_store.entries {
-        tl.store_add_entry(&store, entry.project_id, entry.start, entry.end)
-    }
+    store, store_ok := tl.read_store_file()
 
     rl.SetTraceLogLevel(.WARNING)
     rl.SetConfigFlags({ .WINDOW_RESIZABLE })
@@ -40,12 +33,19 @@ main :: proc() {
     project_names_width := f32(0)
     durations_width := f32(0)
     current_entry: ^tl.Entry
+    last_serialized := time.now()
 
     for !rl.WindowShouldClose() {
         if current_entry == nil {
             FlashWindow(rl.GetWindowHandle(), 0)
         } else {
             current_entry.end = time.now()
+            current_minutes := time.duration_minutes(time.since(current_entry.start))
+            since_last_serialized := time.duration_minutes(time.since(last_serialized))
+            if current_minutes > 1 && since_last_serialized > 1 {
+                tl.write_store_file(store)
+                last_serialized = time.now()
+            }
         }
 
         scroll_render_target := rl.LoadRenderTexture(i32(scroll_content_size.x), i32(scroll_content_size.y))

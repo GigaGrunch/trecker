@@ -36,6 +36,17 @@ read_store_file :: proc() -> (Store, bool) {
     return store_deserialize(transmute(string)serialized)
 }
 
+write_store_file :: proc(store: Store) -> bool {
+    serialized := store_serialize(store)
+    defer delete(serialized)
+    write_ok := os.write_entire_file(SESSION_FILE_PATH, serialized)
+    if !write_ok {
+        fmt.printfln("Failed to write file at '%v'.", SESSION_FILE_PATH)
+        return false
+    }
+    return true
+}
+
 get_today_duration :: proc(store: Store, project: Project) -> (today_duration: time.Duration) {
     year, month, day := time.date(time.now())    
     for entry in store.entries {
@@ -47,6 +58,46 @@ get_today_duration :: proc(store: Store, project: Project) -> (today_duration: t
         }
     }
     return
+}
+
+store_serialize :: proc(store: Store) -> []u8 {
+    builder := strings.builder_make()
+    
+    strings.write_string(&builder, "version: ") // TODO: these are the same consts as in deserialize
+    strings.write_int(&builder, STORE_VERSION)
+    strings.write_string(&builder, "\n\n")
+    
+    for project in store.projects {
+        strings.write_string(&builder, "project: ")
+        strings.write_string(&builder, project.id)
+        strings.write_string(&builder, " '")
+        strings.write_string(&builder, project.name)
+        strings.write_string(&builder, "'\n")
+    }
+    strings.write_string(&builder, "\n")
+    
+    for entry in store.entries {
+        strings.write_string(&builder, "entry: ")
+        strings.write_string(&builder, entry.project_id)
+        strings.write_string(&builder, " ")
+        start_str, start_ok := time.time_to_rfc3339(entry.start)
+        end_str, end_ok := time.time_to_rfc3339(entry.end)
+        defer {
+            delete(start_str)
+            delete(end_str)
+        }
+        if !start_ok || !end_ok {
+            fmt.printfln("Failed to serialize time stamps for entry: %v", entry)
+            os.exit(1)
+        }
+        
+        strings.write_string(&builder, start_str[:len(TIME_FORMAT)])
+        strings.write_string(&builder, "..")
+        strings.write_string(&builder, end_str[:len(TIME_FORMAT)])
+        strings.write_string(&builder, "\n")
+    }
+    
+    return builder.buf[:]
 }
 
 store_deserialize :: proc(serialized: string) -> (res: Store, ok: bool) {
