@@ -69,20 +69,20 @@ main :: proc() {
                     rect.y = project_y
                     rect.height = font_size
 
-                    project_name := fmt.ctprint(project.name)
+                    project_name := fmt.ctprintf("%v [%v]", project.name, project.id)
                     project_names_width = max(project_names_width, rl.MeasureTextEx(font, project_name, font_size, 1).x)
                     rect.width = project_names_width
                     rl.GuiLabel(rect, project_name)
+                    rect.x += rect.width + padding
 
                     duration := tl.get_today_duration(store, project)
                     duration_buf: [len("00:00:00")]u8
                     duration_str := fmt.ctprint(time.duration_to_string_hms(duration, duration_buf[:]))
                     durations_width = max(durations_width, rl.MeasureTextEx(font, duration_str, font_size, 1).x)
-                    rect.x += rect.width + padding
                     rect.width = durations_width
                     rl.GuiLabel(rect, duration_str)
-
                     rect.x += rect.width + padding
+
                     rect.width = 30 * scale_factor
                     if current_entry != nil && strings.compare(current_entry.project_id, project.id) == 0 {
                         stop_icon := rl.GuiIconName.ICON_PLAYER_STOP
