@@ -62,6 +62,7 @@ command_gui :: proc() {
     scroll_value := f32(0)
     scroll_content_size := rl.Vector2 { 1, 1 }
     project_names_width := f32(0)
+    durations_width := f32(0)
 
     for !rl.WindowShouldClose() {
         scroll_value += rl.GetMouseWheelMove() * 20
@@ -81,21 +82,23 @@ command_gui :: proc() {
                 project_y := padding
 
                 for project in store.projects {
+                    rect: rl.Rectangle
+                    rect.x = padding
+                    rect.y = project_y
+                    rect.height = font_size
+
                     project_name := fmt.ctprint(project.name)
                     project_names_width = max(project_names_width, rl.MeasureTextEx(font, project_name, font_size, 1).x)
-                    rect := rl.Rectangle {
-                        x = padding,
-                        y = project_y,
-                        width = project_names_width,
-                        height = font_size,
-                    }
+                    rect.width = project_names_width
                     rl.GuiLabel(rect, project_name)
 
-                    rect.x += rect.width + padding
                     duration := get_today_duration(store, project)
                     duration_buf: [len("00:00:00")]u8
-                    duration_str := time.duration_to_string_hms(duration, duration_buf[:])
-                    rl.GuiLabel(rect, fmt.ctprintf("%v", duration_str))
+                    duration_str := fmt.ctprint(time.duration_to_string_hms(duration, duration_buf[:]))
+                    durations_width = max(durations_width, rl.MeasureTextEx(font, duration_str, font_size, 1).x)
+                    rect.x += rect.width + padding
+                    rect.width = durations_width
+                    rl.GuiLabel(rect, duration_str)
 
                     project_y += rect.height + padding
                 }
