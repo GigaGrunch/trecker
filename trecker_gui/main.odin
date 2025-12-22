@@ -32,6 +32,7 @@ main :: proc() {
     scroll_content_size := rl.Vector2 { 1, 1 }
     project_names_width := f32(0)
     durations_width := f32(0)
+    buttons_width := f32(0)
     current_entry: ^tl.Entry
     last_serialized := time.now()
 
@@ -49,10 +50,11 @@ main :: proc() {
         scroll_render_target := rl.LoadRenderTexture(i32(scroll_content_size.x), i32(scroll_content_size.y))
         defer rl.UnloadRenderTexture(scroll_render_target)
 
+        padding := 10 * scale_factor
         scroll_value += rl.GetMouseWheelMove() * 20
         scroll_value = clamp(scroll_value, f32(rl.GetScreenHeight()) - scroll_content_size.y, 0)
-        scroll_content_size.x = f32(rl.GetScreenWidth())
-        scroll_content_size.y = 1
+        scroll_content_size.x = padding + project_names_width + padding + durations_width + padding + buttons_width + padding
+        scroll_content_size.y = 0
 
         rl.BeginDrawing()
         rl.ClearBackground(rl.BLACK)
@@ -60,7 +62,6 @@ main :: proc() {
             rl.BeginTextureMode(scroll_render_target)
             rl.ClearBackground(rl.BLACK)
             {
-                padding := 10 * scale_factor
                 project_y := padding
 
                 for project in store.projects {
@@ -90,7 +91,8 @@ main :: proc() {
                     rl.GuiLabel(rect, duration_str)
                     rect.x += rect.width + padding
 
-                    rect.width = 30 * scale_factor
+                    buttons_width = max(buttons_width, 30 * scale_factor)
+                    rect.width = buttons_width
                     if current_entry != nil && strings.compare(current_entry.project_id, project.id) == 0 {
                         stop_icon := rl.GuiIconName.ICON_PLAYER_STOP
                         if rl.GuiButton(rect, fmt.ctprintf("#%d#", stop_icon)) {
