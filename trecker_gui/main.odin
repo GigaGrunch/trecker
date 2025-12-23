@@ -22,15 +22,10 @@ main :: proc() {
     rl.SetTargetFPS(60)
     rl.InitWindow(1280, 720, "trecker")
 
-    scale_factor := rl.GetWindowScaleDPI().x
-    font_size := 24 * scale_factor
-    font := rl.LoadFontEx("RobotoCondensed-Regular.ttf", i32(font_size), nil, 0)
-    rl.GuiSetStyle(nil, i32(rl.GuiDefaultProperty.TEXT_SIZE), i32(font_size))
+    font := rl.LoadFontEx("RobotoCondensed-Regular.ttf", i32(get_font_size()), nil, 0)
+    rl.GuiSetStyle(nil, i32(rl.GuiDefaultProperty.TEXT_SIZE), i32(get_font_size()))
     rl.GuiSetFont(font)
 
-    project_names_width := f32(0)
-    durations_width := f32(0)
-    buttons_width := f32(0)
     current_entry: ^tl.Entry
     last_serialized := time.now()
 
@@ -39,65 +34,86 @@ main :: proc() {
             FlashWindow(rl.GetWindowHandle(), 0)
         } else {
             current_entry.end = time.now()
-            if time.duration_minutes(time.since(last_serialized)) > 1 {
+            since_serialized := time.duration_minutes(time.since(last_serialized))
+            entry_duration := time.duration_minutes(time.diff(current_entry.start, current_entry.end))
+            if entry_duration > 1 && since_serialized > 1 {
                 tl.write_store_file(store)
                 last_serialized = time.now()
             }
         }
 
-        padding := 10 * scale_factor
-        row_width := padding + project_names_width + padding + durations_width + padding + buttons_width + padding
-
         rl.BeginDrawing()
         rl.ClearBackground(rl.BLACK)
         {
-            project_y := padding
-
-            for project in store.projects {
-                rect: rl.Rectangle
-                rect.x = padding
-                rect.y = project_y
-                rect.height = font_size
-
-                row_background_rect := rl.Rectangle {
-                    y = rect.y - padding / 2,
-                    width = row_width,
-                    height = rect.height + padding,
-                }
-                rl.GuiGroupBox(row_background_rect, nil)
-
-                project_name := fmt.ctprintf("%v [%v]", project.name, project.id)
-                project_names_width = max(project_names_width, rl.MeasureTextEx(font, project_name, font_size, 1).x)
-                rect.width = project_names_width
-                rl.GuiLabel(rect, project_name)
-                rect.x += rect.width + padding
-
-                duration := tl.get_today_duration(store, project)
-                duration_buf: [len("00:00:00")]u8
-                duration_str := fmt.ctprint(time.duration_to_string_hms(duration, duration_buf[:]))
-                durations_width = max(durations_width, rl.MeasureTextEx(font, duration_str, font_size, 1).x)
-                rect.width = durations_width
-                rl.GuiLabel(rect, duration_str)
-                rect.x += rect.width + padding
-
-                buttons_width = max(buttons_width, 30 * scale_factor)
-                rect.width = buttons_width
-                if current_entry != nil && strings.compare(current_entry.project_id, project.id) == 0 {
-                    stop_icon := rl.GuiIconName.ICON_PLAYER_STOP
-                    if rl.GuiButton(rect, fmt.ctprintf("#%d#", stop_icon)) {
-                        current_entry = nil
-                    }
-                } else {
-                    play_icon := rl.GuiIconName.ICON_PLAYER_PLAY
-                    if rl.GuiButton(rect, fmt.ctprintf("#%d#", play_icon)) {
-                        current_entry = tl.store_add_entry(&store, project.id, time.now(), time.now())
-                    }
-                }
-
-                project_y += rect.height + padding
-            }
+            current_entry = draw_time_tracker(&store, current_entry)
         }
         rl.EndDrawing()
     }
 }
 
+draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (current_entry: ^tl.Entry) {
+    @(static) project_names_width := f32(0)
+    @(static) durations_width := f32(0)
+    @(static) buttons_width := f32(0)
+
+    current_entry = old_current_entry
+
+    padding := 10 * get_scale_factor()
+    row_width := padding + project_names_width + padding + durations_width + padding + buttons_width + padding
+    project_y := padding
+    font := rl.GuiGetFont()
+
+    for project in store.projects {
+        rect: rl.Rectangle
+        rect.x = padding
+        rect.y = project_y
+        rect.height = get_font_size()
+
+        row_background_rect := rl.Rectangle {
+            y = rect.y - padding / 2,
+            width = row_width,
+            height = rect.height + padding,
+        }
+        rl.GuiGroupBox(row_background_rect, nil)
+
+        project_name := fmt.ctprintf("%v [%v]", project.name, project.id)
+        project_names_width = max(project_names_width, rl.MeasureTextEx(font, project_name, get_font_size(), 1).x)
+        rect.width = project_names_width
+        rl.GuiLabel(rect, project_name)
+        rect.x += rect.width + padding
+
+        duration := tl.get_today_duration(store^, project)
+        duration_buf: [len("00:00:00")]u8
+        duration_str := fmt.ctprint(time.duration_to_string_hms(duration, duration_buf[:]))
+        durations_width = max(durations_width, rl.MeasureTextEx(font, duration_str, get_font_size(), 1).x)
+        rect.width = durations_width
+        rl.GuiLabel(rect, duration_str)
+        rect.x += rect.width + padding
+
+        buttons_width = max(buttons_width, 30 * get_scale_factor())
+        rect.width = buttons_width
+        if current_entry != nil && strings.compare(current_entry.project_id, project.id) == 0 {
+            stop_icon := rl.GuiIconName.ICON_PLAYER_STOP
+            if rl.GuiButton(rect, fmt.ctprintf("#%d#", stop_icon)) {
+                current_entry = nil
+            }
+        } else {
+            play_icon := rl.GuiIconName.ICON_PLAYER_PLAY
+            if rl.GuiButton(rect, fmt.ctprintf("#%d#", play_icon)) {
+                current_entry = tl.store_add_entry(store, project.id, time.now(), time.now())
+            }
+        }
+
+        project_y += rect.height + padding
+    }
+
+    return
+}
+
+get_font_size :: proc() -> f32 {
+    return 24 * get_scale_factor()
+}
+
+get_scale_factor :: proc() -> f32 {
+    return rl.GetWindowScaleDPI().x
+}
