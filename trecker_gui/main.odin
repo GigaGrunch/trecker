@@ -108,12 +108,12 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
     row_width := padding + project_names_width + padding + durations_width + padding + buttons_width + padding
     font := rl.GuiGetFont()
     rect: rl.Rectangle
-    rect.y = padding
+    rect.y = 2 * (get_font_size() + padding)
     rect.height = get_font_size()
 
     for project in store.projects {
         rect.x = padding
-        
+
         row_background_rect := rl.Rectangle {
             y = rect.y - padding / 2,
             width = row_width,
