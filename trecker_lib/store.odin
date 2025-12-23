@@ -47,6 +47,17 @@ write_store_file :: proc(store: Store) -> bool {
     return true
 }
 
+store_destroy :: proc(store: ^Store) {
+    for project in store.projects {
+        delete(project.id)
+        delete(project.name)
+    }
+    for entry in store.entries do delete(entry.project_id)
+    delete(store.projects)
+    delete(store.entries)
+    store^ = {}
+}
+
 get_today_duration :: proc(store: Store, project: Project) -> (today_duration: time.Duration) {
     year, month, day := time.date(time.now())    
     for entry in store.entries {

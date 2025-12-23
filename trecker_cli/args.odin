@@ -1,4 +1,4 @@
-package trecker
+package trecker_cli
 
 import "core:strings"
 import "core:fmt"
@@ -11,7 +11,6 @@ Command :: enum {
     list,
     summary,
     csv,
-    gui,
 }
 
 Args :: struct {
@@ -54,7 +53,6 @@ print_usage :: proc() {
             case .list:    fmt.println("    list                                  List all known projects.")
             case .summary: fmt.println("    summary <month> <year>                Print work summary in human readable format.")
             case .csv:     fmt.println("    csv     <month> <year> <user_name>    Print work summary in CSV format specific to how my employer needs it.")
-            case .gui:     fmt.println("    gui                                   Start the graphical user interface.")
         }
     }
 }
@@ -133,8 +131,6 @@ parse_args :: proc(raw_args: []string) -> (args: Args, ok: bool) {
                     }
                     ok = true
                 }
-            case .gui:
-                ok = true
             }
         }
     }
