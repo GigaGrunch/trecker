@@ -28,8 +28,6 @@ main :: proc() {
     rl.GuiSetStyle(nil, i32(rl.GuiDefaultProperty.TEXT_SIZE), i32(font_size))
     rl.GuiSetFont(font)
 
-    scroll_value := f32(0)
-    scroll_content_size := rl.Vector2 { 1, 1 }
     project_names_width := f32(0)
     durations_width := f32(0)
     buttons_width := f32(0)
@@ -47,87 +45,56 @@ main :: proc() {
             }
         }
 
-        scroll_render_target := rl.LoadRenderTexture(i32(scroll_content_size.x), i32(scroll_content_size.y))
-        defer rl.UnloadRenderTexture(scroll_render_target)
-
         padding := 10 * scale_factor
-        scroll_value += rl.GetMouseWheelMove() * 20
-        scroll_value = clamp(scroll_value, f32(rl.GetScreenHeight()) - scroll_content_size.y, 0)
-        scroll_content_size.x = padding + project_names_width + padding + durations_width + padding + buttons_width + padding
-        scroll_content_size.y = 0
+        row_width := padding + project_names_width + padding + durations_width + padding + buttons_width + padding
 
         rl.BeginDrawing()
         rl.ClearBackground(rl.BLACK)
         {
-            rl.BeginTextureMode(scroll_render_target)
-            rl.ClearBackground(rl.BLACK)
-            {
-                project_y := padding
+            project_y := padding
 
-                for project in store.projects {
-                    rect: rl.Rectangle
-                    rect.x = padding
-                    rect.y = project_y
-                    rect.height = font_size
+            for project in store.projects {
+                rect: rl.Rectangle
+                rect.x = padding
+                rect.y = project_y
+                rect.height = font_size
 
-                    row_background_rect := rl.Rectangle {
-                        y = rect.y - padding / 2,
-                        width = scroll_content_size.x,
-                        height = rect.height + padding,
+                row_background_rect := rl.Rectangle {
+                    y = rect.y - padding / 2,
+                    width = row_width,
+                    height = rect.height + padding,
+                }
+                rl.GuiGroupBox(row_background_rect, nil)
+
+                project_name := fmt.ctprintf("%v [%v]", project.name, project.id)
+                project_names_width = max(project_names_width, rl.MeasureTextEx(font, project_name, font_size, 1).x)
+                rect.width = project_names_width
+                rl.GuiLabel(rect, project_name)
+                rect.x += rect.width + padding
+
+                duration := tl.get_today_duration(store, project)
+                duration_buf: [len("00:00:00")]u8
+                duration_str := fmt.ctprint(time.duration_to_string_hms(duration, duration_buf[:]))
+                durations_width = max(durations_width, rl.MeasureTextEx(font, duration_str, font_size, 1).x)
+                rect.width = durations_width
+                rl.GuiLabel(rect, duration_str)
+                rect.x += rect.width + padding
+
+                buttons_width = max(buttons_width, 30 * scale_factor)
+                rect.width = buttons_width
+                if current_entry != nil && strings.compare(current_entry.project_id, project.id) == 0 {
+                    stop_icon := rl.GuiIconName.ICON_PLAYER_STOP
+                    if rl.GuiButton(rect, fmt.ctprintf("#%d#", stop_icon)) {
+                        current_entry = nil
                     }
-                    rl.GuiGroupBox(row_background_rect, nil)
-
-                    project_name := fmt.ctprintf("%v [%v]", project.name, project.id)
-                    project_names_width = max(project_names_width, rl.MeasureTextEx(font, project_name, font_size, 1).x)
-                    rect.width = project_names_width
-                    rl.GuiLabel(rect, project_name)
-                    rect.x += rect.width + padding
-
-                    duration := tl.get_today_duration(store, project)
-                    duration_buf: [len("00:00:00")]u8
-                    duration_str := fmt.ctprint(time.duration_to_string_hms(duration, duration_buf[:]))
-                    durations_width = max(durations_width, rl.MeasureTextEx(font, duration_str, font_size, 1).x)
-                    rect.width = durations_width
-                    rl.GuiLabel(rect, duration_str)
-                    rect.x += rect.width + padding
-
-                    buttons_width = max(buttons_width, 30 * scale_factor)
-                    rect.width = buttons_width
-                    if current_entry != nil && strings.compare(current_entry.project_id, project.id) == 0 {
-                        stop_icon := rl.GuiIconName.ICON_PLAYER_STOP
-                        if rl.GuiButton(rect, fmt.ctprintf("#%d#", stop_icon)) {
-                            current_entry = nil
-                        }
-                    } else {
-                        play_icon := rl.GuiIconName.ICON_PLAYER_PLAY
-                        if rl.GuiButton(rect, fmt.ctprintf("#%d#", play_icon)) {
-                            current_entry = tl.store_add_entry(&store, project.id, time.now(), time.now())
-                        }
+                } else {
+                    play_icon := rl.GuiIconName.ICON_PLAYER_PLAY
+                    if rl.GuiButton(rect, fmt.ctprintf("#%d#", play_icon)) {
+                        current_entry = tl.store_add_entry(&store, project.id, time.now(), time.now())
                     }
-
-                    project_y += rect.height + padding
                 }
 
-                scroll_content_size.y = project_y
-            }
-            rl.EndTextureMode()
-
-            // texture has to be flipped for some reason
-            rl.DrawTexturePro(scroll_render_target.texture,
-                source = rl.Rectangle { width=scroll_content_size.x, height=-scroll_content_size.y },
-                dest = rl.Rectangle { y=scroll_value, width=scroll_content_size.x, height=scroll_content_size.y },
-                origin = {},
-                rotation = 0,
-                tint = rl.WHITE)
-
-            relative_scroll_bar_height := f32(rl.GetScreenHeight()) / scroll_content_size.y
-            if relative_scroll_bar_height < 1 {
-                scroll_bar: rl.Rectangle
-                scroll_bar.width = 10 * scale_factor
-                scroll_bar.height = f32(rl.GetScreenHeight()) * relative_scroll_bar_height
-                scroll_bar.x = f32(rl.GetScreenWidth()) - scroll_bar.width
-                scroll_bar.y = -scroll_value
-                rl.DrawRectangleRec(scroll_bar, rl.WHITE)
+                project_y += rect.height + padding
             }
         }
         rl.EndDrawing()
