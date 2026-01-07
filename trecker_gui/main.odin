@@ -104,6 +104,9 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
     rect.y = 2 * (get_font_size() + padding)
     rect.height = get_font_size()
 
+    total_duration: time.Duration
+    duration_buf: [len("00:00:00")]u8
+
     for project in store.projects {
         rect.x = padding
 
@@ -121,7 +124,7 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
         rect.x += rect.width + padding
 
         duration := tl.get_today_duration(store^, project)
-        duration_buf: [len("00:00:00")]u8
+        total_duration += duration
         duration_str := fmt.ctprint(time.duration_to_string_hms(duration, duration_buf[:]))
         durations_width = max(durations_width, rl.MeasureTextEx(font, duration_str, get_font_size(), 1).x)
         rect.width = durations_width
@@ -144,6 +147,11 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
 
         rect.y += rect.height + padding
     }
+
+    rect.x = padding + project_names_width + padding
+    rect.width = durations_width
+    total_duration_str := fmt.ctprint(time.duration_to_string_hms(total_duration, duration_buf[:]))
+    rl.GuiLabel(rect, total_duration_str)
 
     return
 }
