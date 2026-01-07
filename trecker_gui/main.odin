@@ -7,13 +7,6 @@ import "core:c"
 import rl "vendor:raylib"
 import tl "../trecker_lib"
 
-foreign import user32 "system:user32.lib"
-WIN32_BOOL :: c.int;
-WIN32_HWND :: rawptr
-foreign user32 {
-    FlashWindow :: proc "stdcall" (hWnd: WIN32_HWND, bInvert: WIN32_BOOL) -> WIN32_BOOL ---
-}
-
 Tab :: enum {
     tracker,
     graph,
@@ -37,7 +30,7 @@ main :: proc() {
 
     for !rl.WindowShouldClose() {
         if current_entry == nil {
-            FlashWindow(rl.GetWindowHandle(), 0)
+            flash_window(rl.GetWindowHandle())
         } else {
             current_entry.end = time.now()
             since_serialized := time.duration_minutes(time.since(last_serialized))
