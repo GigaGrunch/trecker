@@ -97,6 +97,29 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
 
     current_entry = old_current_entry
 
+    sorted_projects := make([dynamic]tl.Project, allocator=context.temp_allocator)
+
+    for project in store.projects {
+        append(&sorted_projects, project)
+    }
+
+    for entry in store.entries {
+        index := 0
+        for ;index < len(sorted_projects); index += 1 {
+            if strings.equal_fold(entry.project_id, sorted_projects[index].id) {
+                break
+            }
+        }
+
+        project := sorted_projects[index]
+
+        for i := index; i > 0; i -= 1 {
+            sorted_projects[i] = sorted_projects[i - 1]
+        }
+
+        sorted_projects[0] = project
+    }
+
     font := rl.GuiGetFont()
 
     total_duration: time.Duration
@@ -105,7 +128,7 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
     project_name_strings := make([dynamic]cstring, allocator=context.temp_allocator)
     duration_strings := make([dynamic]cstring, allocator=context.temp_allocator)
 
-    for project in store.projects {
+    for project in sorted_projects {
         project_name := fmt.ctprintf("%v [%v]", project.name, project.id)
         append(&project_name_strings, project_name)
         project_names_width = max(project_names_width, rl.MeasureTextEx(font, project_name, get_font_size(), 1).x)
@@ -123,7 +146,7 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
     padding := 10 * get_scale_factor()
     row_width := padding + project_names_width + padding + durations_width + padding + buttons_width + padding
 
-    for i in 0..<len(store.projects) {
+    for i in 0..<len(sorted_projects) {
         rect := rl.Rectangle {
             x = 0,
             y = f32(2 + i) * (get_font_size() + padding) - padding / 2,
@@ -157,8 +180,8 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
         rl.GuiLabel(rect, duration_str)
     }
 
-    for i in 0..<len(store.projects) {
-        project := store.projects[i]
+    for i in 0..<len(sorted_projects) {
+        project := sorted_projects[i]
 
         rect := rl.Rectangle {
             x = padding + project_names_width + padding + durations_width + padding,
