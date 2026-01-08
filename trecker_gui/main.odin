@@ -127,6 +127,7 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
 
     project_name_strings := make([dynamic]cstring, allocator=context.temp_allocator)
     duration_strings := make([dynamic]cstring, allocator=context.temp_allocator)
+    append(&duration_strings, "--:--:--")
 
     for project in sorted_projects {
         project_name := fmt.ctprintf("%v [%v]", project.name, project.id)
@@ -141,7 +142,7 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
     }
 
     total_duration_str := fmt.ctprint(time.duration_to_string_hms(total_duration, duration_buf[:]))
-    append(&duration_strings, total_duration_str)
+    duration_strings[0] = total_duration_str
 
     padding := 10 * get_scale_factor()
     row_width := padding + project_names_width + padding + durations_width + padding + buttons_width + padding
@@ -149,7 +150,7 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
     for i in 0..<len(sorted_projects) {
         rect := rl.Rectangle {
             x = 0,
-            y = f32(2 + i) * (get_font_size() + padding) - padding / 2,
+            y = f32(3 + i) * (get_font_size() + padding) - padding / 2,
             width = row_width,
             height = get_font_size() + padding,
         }
@@ -161,7 +162,7 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
 
         rect := rl.Rectangle {
             x = padding,
-            y = f32(2 + i) * (get_font_size() + padding),
+            y = f32(3 + i) * (get_font_size() + padding),
             width = project_names_width,
             height = get_font_size(),
         }
@@ -185,7 +186,7 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
 
         rect := rl.Rectangle {
             x = padding + project_names_width + padding + durations_width + padding,
-            y = f32(2 + i) * (get_font_size() + padding),
+            y = f32(3 + i) * (get_font_size() + padding),
             width = buttons_width,
             height = get_font_size(),
         }
