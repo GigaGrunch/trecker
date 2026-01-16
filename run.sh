@@ -1,7 +1,7 @@
 set -e
 
 exe="trecker_$1"
-if [[ `uname` == "WindowsNT" ]]
+if [[ `uname` == "WindowsNT" ]] || [[ `uname` == MINGW64_NT-* ]]
 then
 	exe="$exe.exe"
 else
