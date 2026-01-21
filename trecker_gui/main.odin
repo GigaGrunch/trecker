@@ -4,19 +4,14 @@ import "core:fmt"
 import "core:strings"
 import "core:time"
 import "core:c"
+import "core:math"
 import rl "vendor:raylib"
 import tl "../trecker_lib"
-
-Tab :: enum {
-    tracker,
-    graph,
-}
 
 main :: proc() {
     store, store_ok := tl.read_store_file()
 
     rl.SetTraceLogLevel(.WARNING)
-    rl.SetConfigFlags({ .WINDOW_RESIZABLE })
     rl.SetTargetFPS(60)
     rl.InitWindow(1280, 720, "trecker")
 
@@ -24,7 +19,6 @@ main :: proc() {
     rl.GuiSetStyle(nil, i32(rl.GuiDefaultProperty.TEXT_SIZE), i32(get_font_size()))
     rl.GuiSetFont(font)
 
-    current_tab: Tab
     current_entry: ^tl.Entry
     last_serialized := time.now()
 
@@ -44,12 +38,9 @@ main :: proc() {
         rl.BeginDrawing()
         rl.ClearBackground(rl.BLACK)
         {
-            current_tab = draw_tab_selection(current_tab)
-            switch current_tab {
-                case .tracker:
-                    current_entry = draw_time_tracker(&store, current_entry)
-                case .graph:
-            }
+            tracker_size: rl.Vector2
+            current_entry, tracker_size = draw_time_tracker(&store, current_entry)
+            rl.SetWindowSize(i32(math.ceil(tracker_size.x)), i32(math.ceil(tracker_size.y)))
         }
         rl.EndDrawing()
 
@@ -57,42 +48,7 @@ main :: proc() {
     }
 }
 
-draw_tab_selection :: proc(old_current_tab: Tab) -> (current_tab: Tab) {
-    @(static) tab_names_width := f32(0)
-
-    current_tab = old_current_tab
-
-    padding := 10 * get_scale_factor()
-    tab_x := padding
-    font := rl.GuiGetFont()
-
-    rect: rl.Rectangle
-    rect.x = padding
-    rect.y = padding
-    rect.width = tab_names_width + padding
-    rect.height = get_font_size()
-
-    for tab in Tab {
-        tab_name: cstring
-        switch tab {
-            case .tracker: tab_name = "Tracker"
-            case .graph: tab_name = "Graph"
-        }
-
-        tab_names_width = max(tab_names_width, rl.MeasureTextEx(font, tab_name, get_font_size(), 1).x)
-        rl.GuiSetState(i32(rl.GuiState.STATE_PRESSED if current_tab == tab else rl.GuiState.STATE_NORMAL))
-        if rl.GuiButton(rect, tab_name) {
-            current_tab = tab
-        }
-        rl.GuiSetState(i32(rl.GuiState.STATE_NORMAL))
-
-        rect.x += rect.width + padding
-    }
-
-    return
-}
-
-draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (current_entry: ^tl.Entry) {
+draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (current_entry: ^tl.Entry, tracker_size: rl.Vector2) {
     @(static) project_names_width := f32(0)
     @(static) durations_width := f32(0)
     buttons_width := 30 * get_scale_factor()
@@ -152,11 +108,14 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
     for i in 0..<len(sorted_projects) {
         rect := rl.Rectangle {
             x = 0,
-            y = f32(3 + i) * (get_font_size() + padding) - padding / 2,
+            y = f32(1 + i) * (get_font_size() + padding) - padding / 2,
             width = row_width,
             height = get_font_size() + padding,
         }
         rl.GuiGroupBox(rect, nil)
+
+        tracker_size.x = max(tracker_size.x, rect.x + rect.width)
+        tracker_size.y = max(tracker_size.y, rect.y + rect.height)
     }
 
     for i in 0..<len(project_name_strings) {
@@ -164,7 +123,7 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
 
         rect := rl.Rectangle {
             x = padding,
-            y = f32(3 + i) * (get_font_size() + padding),
+            y = f32(1 + i) * (get_font_size() + padding),
             width = project_names_width,
             height = get_font_size(),
         }
@@ -176,7 +135,7 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
 
         rect := rl.Rectangle {
             x = padding + project_names_width + padding,
-            y = f32(2 + i) * (get_font_size() + padding),
+            y = f32(i) * (get_font_size() + padding),
             width = durations_width,
             height = get_font_size(),
         }
@@ -188,7 +147,7 @@ draw_time_tracker :: proc(store: ^tl.Store, old_current_entry: ^tl.Entry) -> (cu
 
         rect := rl.Rectangle {
             x = padding + project_names_width + padding + durations_width + padding,
-            y = f32(3 + i) * (get_font_size() + padding),
+            y = f32(1 + i) * (get_font_size() + padding),
             width = buttons_width,
             height = get_font_size(),
         }
