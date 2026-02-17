@@ -23,9 +23,11 @@ main :: proc() {
     last_serialized := time.now()
 
     for !rl.WindowShouldClose() {
+        window_title: cstring
+
         if current_entry == nil {
             flash_window(rl.GetWindowHandle())
-            fmt.print("\x1b]0;trecker idle\x07")
+            window_title = fmt.ctprint("trecker idle")
         } else {
             current_entry.end = time.now()
             since_serialized := time.duration_minutes(time.since(last_serialized))
@@ -34,8 +36,11 @@ main :: proc() {
                 tl.write_store_file(store)
                 last_serialized = time.now()
             }
-            fmt.printf("\x1b]0;trecker %v\x07", current_entry.project_id)
+            window_title = fmt.ctprintf("trecker %v", current_entry.project_id)
         }
+
+        fmt.printf("\x1b]0;%v\x07", window_title)
+        rl.SetWindowTitle(window_title)
 
         rl.BeginDrawing()
         rl.ClearBackground(rl.BLACK)
