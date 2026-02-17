@@ -31,12 +31,12 @@ main :: proc() {
     if !args_ok do os.exit(1)
     
     switch args.command {
-        case .init: command_init()
-        case .add: command_add(args.inner.(Add_Args))
-        case .start: command_start(args.inner.(Start_Args))
-        case .list: command_list()
-        case .summary: command_summary(args.inner.(Summary_Args))
-        case .csv: command_csv(args.inner.(Csv_Args))
+    case .init: command_init()
+    case .add: command_add(args.inner.(Add_Args))
+    case .start: command_start(args.inner.(Start_Args))
+    case .list: command_list()
+    case .summary: command_summary(args.inner.(Summary_Args))
+    case .csv: command_csv(args.inner.(Csv_Args))
     }
 }
 

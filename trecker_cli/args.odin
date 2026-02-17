@@ -47,12 +47,12 @@ print_usage :: proc() {
     fmt.println("Commands:")
     for command in Command {
         switch command {
-            case .init:    fmt.println("    init                                  Initialize './trecker_session.ini'. This is the first command you will have to use.")
-            case .add:     fmt.println("    add     <project_id> <project_name>   Add a new project to the list.")
-            case .start:   fmt.println("    start   <project_id>                  Start tracking time for the given project.")
-            case .list:    fmt.println("    list                                  List all known projects.")
-            case .summary: fmt.println("    summary <month> <year>                Print work summary in human readable format.")
-            case .csv:     fmt.println("    csv     <month> <year> <user_name>    Print work summary in CSV format specific to how my employer needs it.")
+        case .init:    fmt.println("    init                                  Initialize './trecker_session.ini'. This is the first command you will have to use.")
+        case .add:     fmt.println("    add     <project_id> <project_name>   Add a new project to the list.")
+        case .start:   fmt.println("    start   <project_id>                  Start tracking time for the given project.")
+        case .list:    fmt.println("    list                                  List all known projects.")
+        case .summary: fmt.println("    summary <month> <year>                Print work summary in human readable format.")
+        case .csv:     fmt.println("    csv     <month> <year> <user_name>    Print work summary in CSV format specific to how my employer needs it.")
         }
     }
 }
@@ -77,8 +77,7 @@ parse_args :: proc(raw_args: []string) -> (args: Args, ok: bool) {
                 if len(raw_args) < 2 {
                     fmt.println("Missing argument: project_id")
                     print_usage()
-                }
-                else if len(raw_args) < 3 {
+                } else if len(raw_args) < 3 {
                     fmt.println("Missing argument: project_name")
                     print_usage()
                 } else {                

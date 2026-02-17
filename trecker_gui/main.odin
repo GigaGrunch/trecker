@@ -3,13 +3,16 @@ package trecker_gui
 import "core:fmt"
 import "core:strings"
 import "core:time"
-import "core:c"
 import "core:math"
+import "core:os"
 import rl "vendor:raylib"
 import tl "../trecker_lib"
 
 main :: proc() {
     store, store_ok := tl.read_store_file()
+    if !store_ok {
+        os.exit(1)
+    }
 
     rl.SetTraceLogLevel(.WARNING)
     rl.SetTargetFPS(60)

@@ -4,7 +4,7 @@ import "core:c"
 
 foreign import user32 "system:user32.lib"
 
-WIN32_BOOL :: c.int;
+WIN32_BOOL :: c.int
 WIN32_HWND :: rawptr
 
 foreign user32 {
