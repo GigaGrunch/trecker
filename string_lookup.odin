@@ -6,29 +6,22 @@ import "core:strings"
 import "core:mem/virtual"
 import "core:testing"
 
-string_allocator: mem.Allocator
+string_arena: virtual.Arena
 string_lookup: [dynamic]cstring
 string_index_lookup: map[string]int
 
-string_lookup_init :: proc() -> (ok := false) {
-	string_arena: virtual.Arena
-	err := virtual.arena_init_growing(&string_arena)
-	if err != {} {
-		fmt.printfln("Failed to initialize string arena: %v", err)
-	} else {
-		string_allocator = virtual.arena_allocator(&string_arena)
-		ok = true
-	}
-	return
+string_lookup_init :: proc() -> mem.Allocator_Error {
+	return virtual.arena_init_growing(&string_arena)
 }
 
-string_get_stable :: proc(str: string) -> string {
-	return string(cstring_get_stable(str))
+stable_string :: proc(str: string) -> string {
+	return string(stable_cstring(str))
 }
 
-cstring_get_stable :: proc(str: string) -> cstring {
+stable_cstring :: proc(str: string) -> cstring {
 	if str not_in string_index_lookup {
-		dupe := strings.clone_to_cstring(str, string_allocator)
+		allocator := virtual.arena_allocator(&string_arena)
+		dupe := strings.clone_to_cstring(str, allocator)
 		string_index_lookup[string(dupe)] = len(string_lookup)
 		append(&string_lookup, dupe)
 	}
@@ -40,12 +33,13 @@ cstring_get_stable :: proc(str: string) -> cstring {
 
 @test
 test_string_lookup :: proc(t: ^testing.T) {
-	string_allocator = context.temp_allocator
+	init_err := string_lookup_init()
+	testing.expect(t, init_err == .None)
+
 	defer {
-		free_all(context.temp_allocator)
+		virtual.arena_destroy(&string_arena)
 		delete(string_lookup)
 		delete(string_index_lookup)
-		string_allocator = {}
 	}
 
 	test_buffer := make([]u8, 10)
@@ -54,15 +48,15 @@ test_string_lookup :: proc(t: ^testing.T) {
 	test_1_original := "test1"
 	mem.copy(raw_data(test_buffer), raw_data(test_1_original), len(test_1_original))
 	test_1_ptr := transmute(string)(test_buffer[:len(test_1_original)])
-	test_1_original_result := string_get_stable(test_1_original)
-	test_1_ptr_result := string_get_stable(test_1_ptr)
+	test_1_original_result := stable_string(test_1_original)
+	test_1_ptr_result := stable_string(test_1_ptr)
 
 	test_2_original := "test2"
 	mem.zero(raw_data(test_buffer), len(test_buffer))
 	mem.copy(raw_data(test_buffer), raw_data(test_2_original), len(test_2_original))
 	test_2_ptr := transmute(string)(test_buffer[:len(test_2_original)])
-	test_2_original_result := string_get_stable(test_2_original)
-	test_2_ptr_result := string_get_stable(test_2_ptr)
+	test_2_original_result := stable_string(test_2_original)
+	test_2_ptr_result := stable_string(test_2_ptr)
 
 	testing.expect(t, raw_data(test_1_original_result) == raw_data(test_1_ptr_result))
 	testing.expect(t, raw_data(test_1_original_result) != raw_data(test_1_original))
