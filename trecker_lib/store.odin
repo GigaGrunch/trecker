@@ -27,10 +27,10 @@ Entry :: struct {
 }
 
 read_store_file :: proc() -> (Store, bool) {
-    serialized, file_ok := os.read_entire_file(SESSION_FILE_PATH)
+    serialized, read_err := os.read_entire_file(SESSION_FILE_PATH, context.allocator)
     defer delete(serialized)
-    if !file_ok {
-        fmt.printfln("Failed to read file at '%v'.", SESSION_FILE_PATH)
+    if read_err != {} {
+        fmt.printfln("Got error '%v' while reading file at '%v'.", read_err, SESSION_FILE_PATH)
         return {}, false
     }
     return store_deserialize(transmute(string)serialized)
@@ -39,9 +39,9 @@ read_store_file :: proc() -> (Store, bool) {
 write_store_file :: proc(store: Store) -> bool {
     serialized := store_serialize(store)
     defer delete(serialized)
-    write_ok := os.write_entire_file(SESSION_FILE_PATH, serialized)
-    if !write_ok {
-        fmt.printfln("Failed to write file at '%v'.", SESSION_FILE_PATH)
+    write_err := os.write_entire_file(SESSION_FILE_PATH, serialized)
+    if write_err != {} {
+        fmt.printfln("Got error '%v' while writing file to '%v'.", write_err, SESSION_FILE_PATH)
         return false
     }
     return true
