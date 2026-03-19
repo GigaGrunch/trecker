@@ -105,22 +105,11 @@ main :: proc() {
 				for line in parsed_lines["entry"] {
 					entry_ok := true
 
-					parse_time :: proc(value: string) -> time.Time {
-						parse_str := fmt.tprintf("%v+00:00", value)
-						result, _, _ := time.rfc3339_to_time_and_offset(parse_str)
-						return result
-					}
-
 					line_it := line.value
 					project_id, _ := strings.split_iterator(&line_it, " ")
 					project_id = strings.trim_space(project_id)
 					time_range := line_it
-					time_it := time_range
-					start_str, _ := strings.split_iterator(&time_it, "..")
-					start_str = strings.trim_space(start_str)
-					end_str := strings.trim_space(time_it)
-					start_time := parse_time(start_str)
-					end_time := parse_time(end_str)
+					start, end := parse_time_range(time_range)
 
 					if project_id == "" {
 						entry_ok = false
@@ -131,7 +120,7 @@ main :: proc() {
 						fmt.printfln("[%v:%v] project '%v' is not defined", STORE_PATH, line.line_num, project_id)
 					}
 
-					if start_time == {} || end_time == {} {
+					if start == {} || end == {} {
 						entry_ok = false
 						fmt.printfln("[%v:%v] failed to parse time range from '%v'", STORE_PATH, line.line_num, time_range)
 					}
@@ -139,8 +128,8 @@ main :: proc() {
 					if entry_ok {
 						entry: Entry
 						entry.project_id = stable_string(project_id)
-						entry.start = start_time
-						entry.end = end_time
+						entry.start = start
+						entry.end = end
 					}
 
 					entries_ok &= entry_ok
@@ -241,6 +230,18 @@ main :: proc() {
 	} else {
 		fmt.printfln("unknown command `%v`", command)
 	}
+}
+
+parse_time_range :: proc(value: string) -> (start, end: time.Time) {
+	time_it := value
+	start_str, _ := strings.split_iterator(&time_it, "..")
+	start_str = strings.trim_space(start_str)
+	start_str = fmt.tprintf("%v+00:00", start_str)
+	start_time, _, _ := time.rfc3339_to_time_and_offset(start_str)
+	end_str := strings.trim_space(time_it)
+	end_str = fmt.tprintf("%v+00:00", end_str)
+	end_time, _, _ := time.rfc3339_to_time_and_offset(end_str)
+	return start_time, end_time
 }
 
 strings_equal :: proc(a, b: string) -> bool {
