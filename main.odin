@@ -130,6 +130,7 @@ main :: proc() {
 						entry.project_id = stable_string(project_id)
 						entry.start = start
 						entry.end = end
+						append(&startup_store.entries, entry)
 					}
 
 					entries_ok &= entry_ok
@@ -165,54 +166,33 @@ main :: proc() {
 		}
 	}
 
-	command, sub_command: string
-	if len(os.args) > 1 {
-		command = os.args[1]
-	}
-	if len(os.args) > 2 {
-		sub_command = os.args[2]
-	}
-
-	if command == "" {
-		fmt.println("no command given")
-	} else if strings_equal(command, "list") {
-		args: struct {}
-		parse_err := flags.parse(&args, os.args[2:])
-
-		if parse_err == nil {
-			sorted_ids := make([dynamic]string, allocator=context.temp_allocator, cap=len(startup_store.projects), len=0)
-			for id in startup_store.projects {
-				append(&sorted_ids, id)
-			}
-			slice.sort(sorted_ids[:])
-
-			fmt.printfln("Store contains %v projects:", len(sorted_ids))
-			for project_id in sorted_ids {
-				project := startup_store.projects[project_id]
-				fmt.printfln("  %v: '%v'", project_id, project.name)
-			}
-		} else {
-			switch err in parse_err {
-			case flags.Parse_Error:
-				fmt.println(err.message)
-			case flags.Help_Request: // TODO
-			case flags.Validation_Error:
-				fmt.println(err.message)
-			case flags.Open_File_Error:
-				fmt.println(err)
-			}
+	{ // command parsing
+		command, sub_command: string
+		if len(os.args) > 1 {
+			command = os.args[1]
 		}
-	} else if strings_equal(command, "add") {
-		if sub_command == "" {
-			fmt.printfln("no sub command for `%v` given", command)
-		} else if strings_equal(sub_command, "entry") {
-			args: struct {
-				project_id: string `args:"pos=0,required"`,
-				time_range: string `args:"pos=1,required"`,
-			}
-			parse_err := flags.parse(&args, os.args[3:])
+		if len(os.args) > 2 {
+			sub_command = os.args[2]
+		}
+
+		if command == "" {
+			fmt.println("no command given")
+		} else if strings_equal(command, "list") {
+			args: struct {}
+			parse_err := flags.parse(&args, os.args[2:])
+
 			if parse_err == nil {
-				// TODO
+				sorted_ids := make([dynamic]string, allocator=context.temp_allocator, cap=len(startup_store.projects), len=0)
+				for id in startup_store.projects {
+					append(&sorted_ids, id)
+				}
+				slice.sort(sorted_ids[:])
+
+				fmt.printfln("Store contains %v projects:", len(sorted_ids))
+				for project_id in sorted_ids {
+					project := startup_store.projects[project_id]
+					fmt.printfln("  %v: '%v'", project_id, project.name)
+				}
 			} else {
 				switch err in parse_err {
 				case flags.Parse_Error:
@@ -224,11 +204,34 @@ main :: proc() {
 					fmt.println(err)
 				}
 			}
+		} else if strings_equal(command, "add") {
+			if sub_command == "" {
+				fmt.printfln("no sub command for `%v` given", command)
+			} else if strings_equal(sub_command, "entry") {
+				args: struct {
+					project_id: Project_ID `args:"pos=0,required"`,
+					time_range: string `args:"pos=1,required"`,
+				}
+				parse_err := flags.parse(&args, os.args[3:])
+				if parse_err == nil {
+					// TODO
+				} else {
+					switch err in parse_err {
+					case flags.Parse_Error:
+						fmt.println(err.message)
+					case flags.Help_Request: // TODO
+					case flags.Validation_Error:
+						fmt.println(err.message)
+					case flags.Open_File_Error:
+						fmt.println(err)
+					}
+				}
+			} else {
+				fmt.printfln("unknown `%v` sub-command `%v`", command, sub_command)
+			}
 		} else {
-			fmt.printfln("unknown `%v` sub-command `%v`", command, sub_command)
+			fmt.printfln("unknown command `%v`", command)
 		}
-	} else {
-		fmt.printfln("unknown command `%v`", command)
 	}
 }
 
@@ -255,7 +258,7 @@ Project_ID :: string
 
 Store :: struct {
 	projects: map[Project_ID]Project,
-	entries: []Entry,
+	entries: [dynamic]Entry,
 }
 
 Project :: struct {
