@@ -5,10 +5,19 @@ import "core:fmt"
 import "core:time"
 import "core:strings"
 import "core:slice"
+import "core:c/libc"
 
-startup_store: Store
+store: Store
+got_interrupt_signal := false
 
 main :: proc() {
+	libc.signal(libc.SIGINT, proc "c" (_: i32) {
+		if got_interrupt_signal {
+			os.exit(1)
+		}
+		got_interrupt_signal = true
+	})
+
 	if err := string_lookup_init(); err != .None {
 		fmt.printfln("string_lookup_init failed with '%v'", err);
 		os.exit(1)
@@ -78,7 +87,7 @@ main :: proc() {
 						project_ok = false
 						fmt.printfln("[%v:%v] project ID is empty", STORE_PATH, line.line_num)
 					}
-					if id in startup_store.projects {
+					if id in store.projects {
 						project_ok = false
 						fmt.printfln("[%v:%v] project ID already defined", STORE_PATH, line.line_num)
 					}
@@ -91,7 +100,7 @@ main :: proc() {
 					if project_ok {
 						project: Project
 						project.name = stable_string(name)
-						startup_store.projects[stable_string(id)] = project
+						store.projects[stable_string(id)] = project
 					}
 
 					projects_ok &= project_ok
@@ -112,7 +121,7 @@ main :: proc() {
 						entry_ok = false
 						fmt.printfln("[%v:%v] project id is empty", STORE_PATH, line.line_num)
 					}
-					else if project_id not_in startup_store.projects {
+					else if project_id not_in store.projects {
 						entry_ok = false
 						fmt.printfln("[%v:%v] project '%v' is not defined", STORE_PATH, line.line_num, project_id)
 					}
@@ -127,7 +136,7 @@ main :: proc() {
 						entry.project_id = stable_string(project_id)
 						entry.start = start
 						entry.end = end
-						append(&startup_store.entries, entry)
+						append(&store.entries, entry)
 					}
 
 					entries_ok &= entry_ok
@@ -151,23 +160,25 @@ main :: proc() {
 				os.exit(1)
 		}
 
-		for project_id in startup_store.projects {
-			project := startup_store.projects[project_id]
+		for project_id in store.projects {
+			project := store.projects[project_id]
 			assert(project_id in string_index_lookup)
 			assert(project.name in string_index_lookup)
 		}
 
-		for entry in startup_store.entries {
-			assert(entry.project_id in startup_store.projects)
+		for entry in store.entries {
+			assert(entry.project_id in store.projects)
 			assert(entry.project_id in string_index_lookup)
 		}
 	}
 
 	free_all(context.temp_allocator)
 
+	Start :: Project_ID
 	Add_Entry :: Entry
 
 	parsed_command: union {
+		Start,
 		Add_Entry,
 	}
 
@@ -177,7 +188,7 @@ main :: proc() {
 			fmt.println("'command' is missing")
 		} else if strings_equal(command_str, "add-entry") {
 			project_id := take_next_arg()
-			project_ok := project_id in startup_store.projects
+			project_ok := project_id in store.projects
 			if project_id == "" {
 				fmt.printfln("'project-id' is missing")
 			} else if !project_ok {
@@ -199,6 +210,18 @@ main :: proc() {
 				add_entry.end = end
 				parsed_command = add_entry
 			}
+		} else if strings_equal(command_str, "start") {
+			project_id := take_next_arg()
+			project_ok := project_id in store.projects
+			if project_id == "" {
+				fmt.printfln("'project-id' is missing")
+			} else if !project_ok {
+				fmt.printfln("project '%v' is not defined", project_id)
+			}
+
+			if project_ok {
+				parsed_command = project_id
+			}
 		} else {
 			fmt.printfln("unknown command '%v'", command_str)
 		}
@@ -213,25 +236,62 @@ main :: proc() {
 
 	{ // execute
 		switch command in parsed_command {
+		case Start:
+			project_id := command
+			project := store.projects[project_id]
+
+			initial_today_duration: time.Duration
+
+			today_year, today_month, today_day := time.date(time.now())    
+			for entry in store.entries {
+				year, month, day := time.date(entry.start)
+				if year == today_year && month == today_month && day == today_day {
+					initial_today_duration += time.diff(entry.start, entry.end)
+				}
+			}
+			
+			entry_i := len(store.entries)
+			append(&store.entries, Entry{})
+			entry := &store.entries[entry_i]
+			entry.project_id = project_id
+			entry.start = time.now()
+			entry.end = time.now()
+			
+			last_serialization_minute := 0
+			duration_buf: [len("00:00:00")]u8
+			today_duration_buf: [len("00:00:00")]u8
+			
+			for !got_interrupt_signal {
+				duration := time.since(entry.start)
+				duration_str := time.duration_to_string_hms(duration, duration_buf[:])
+				today_duration := initial_today_duration + duration
+				today_duration_str := time.duration_to_string_hms(today_duration, today_duration_buf[:])
+
+				clear_line :: "\x1b[2K\r"
+				fmt.printf("%v  %v %v (%v)\r", clear_line, project.name, duration_str, today_duration_str)
+				fmt.printf("\x1b]0;trecker %v %v\x07", project_id, today_duration_str)
+
+				full_minute := int(time.duration_minutes(duration))
+				if full_minute > last_serialization_minute {
+					entry.end = time.now()
+					last_serialization_minute = full_minute
+					store_serialize()
+				}
+
+				time.sleep(1 * time.Second)
+				free_all(context.temp_allocator)
+			}
+			
+			fmt.println()
 		case Add_Entry:
-			output_store: Store
-			for project_id in startup_store.projects {
-				project := startup_store.projects[project_id]
-				output_store.projects[project_id] = project
-			}
-			for entry in startup_store.entries {
-				append(&output_store.entries, entry)
-			}
-
-			new_entry := command
-			append(&output_store.entries, new_entry)
-
-			store_serialize(output_store)
+			entry := command
+			append(&store.entries, entry)
+			store_serialize()
 		}
 	}
 }
 
-store_serialize :: proc(store: Store) {
+store_serialize :: proc() {
 	sb := strings.builder_make(context.temp_allocator)
 	
 	fmt.sbprintfln(&sb, "version: %v", STORE_VERSION)
