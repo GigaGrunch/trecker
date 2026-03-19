@@ -297,10 +297,7 @@ store_serialize :: proc() {
 	fmt.sbprintfln(&sb, "version: %v", STORE_VERSION)
 	fmt.sbprintln(&sb)
 
-	sorted_ids := make([dynamic]Project_ID, allocator=context.temp_allocator, cap=len(store.projects), len=0)
-	for project_id in store.projects {
-		append(&sorted_ids, project_id)
-	}
+	sorted_ids := slice.map_keys(store.projects, context.temp_allocator) or_else panic("TODO")
 	slice.sort(sorted_ids[:])
 
 	for project_id in sorted_ids {
