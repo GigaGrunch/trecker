@@ -256,9 +256,15 @@ main :: proc() {
 			fmt.printfln("unknown command '%v'", command_str)
 		}
 
-		// TODO: check for excess arguments
+		too_many_args := false
+		for excess_arg in take_next_arg() {
+			if parsed_command != nil {
+				too_many_args = true
+				fmt.printfln("excess argument '%v'", excess_arg)
+			}
+		}
 
-		if parsed_command == nil {
+		if parsed_command == nil || too_many_args {
 			fmt.println("usage: TODO")
 			os.exit(1)
 		}
@@ -370,10 +376,11 @@ store_serialize :: proc() {
 	}
 }
 
-take_next_arg :: proc() -> (arg: string) {
+take_next_arg :: proc() -> (arg: string, ok: bool) #optional_ok {
 	@static next_arg_i := 1
 	if len(os.args) > next_arg_i {
 		arg = os.args[next_arg_i]
+		ok = true
 	}
 	next_arg_i += 1
 	return
