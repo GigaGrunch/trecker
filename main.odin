@@ -109,7 +109,7 @@ main :: proc() {
 					project_id, _ := strings.split_iterator(&line_it, " ")
 					project_id = strings.trim_space(project_id)
 					time_range := line_it
-					start, end := parse_time_range(time_range)
+					start, end, range_ok := parse_time_range(time_range)
 
 					if project_id == "" {
 						entry_ok = false
@@ -120,7 +120,7 @@ main :: proc() {
 						fmt.printfln("[%v:%v] project '%v' is not defined", STORE_PATH, line.line_num, project_id)
 					}
 
-					if start == {} || end == {} {
+					if !range_ok {
 						entry_ok = false
 						fmt.printfln("[%v:%v] failed to parse time range from '%v'", STORE_PATH, line.line_num, time_range)
 					}
@@ -214,7 +214,39 @@ main :: proc() {
 				}
 				parse_err := flags.parse(&args, os.args[3:])
 				if parse_err == nil {
-					// TODO
+					project_ok := args.project_id in startup_store.projects
+					start, end, range_ok := parse_time_range(args.time_range)
+
+					if !project_ok {
+						fmt.printfln("project '%v' is not defined", args.project_id)
+					}
+					if !range_ok {
+						fmt.printfln("failed to parse time range from '%v'", args.time_range)
+					}
+
+					if project_ok && range_ok {
+						output_store: Store
+						output_store.projects.allocator = context.temp_allocator
+						output_store.entries.allocator = context.temp_allocator
+						
+						for project_id in startup_store.projects {
+							output_store.projects[project_id] = startup_store.projects[project_id]
+						}
+
+						for entry in startup_store.entries {
+							append(&output_store.entries, entry)
+						}
+
+						new_entry: Entry
+						new_entry.project_id = args.project_id
+						new_entry.start = start
+						new_entry.end = end
+						append(&output_store.entries, new_entry)
+
+						// TOOD: serialize
+					} else {
+						os.exit(1)
+					}
 				} else {
 					switch err in parse_err {
 					case flags.Parse_Error:
@@ -235,7 +267,7 @@ main :: proc() {
 	}
 }
 
-parse_time_range :: proc(value: string) -> (start, end: time.Time) {
+parse_time_range :: proc(value: string) -> (start, end: time.Time, ok: bool) {
 	time_it := value
 	start_str, _ := strings.split_iterator(&time_it, "..")
 	start_str = strings.trim_space(start_str)
@@ -244,7 +276,9 @@ parse_time_range :: proc(value: string) -> (start, end: time.Time) {
 	end_str := strings.trim_space(time_it)
 	end_str = fmt.tprintf("%v+00:00", end_str)
 	end_time, _, _ := time.rfc3339_to_time_and_offset(end_str)
-	return start_time, end_time
+	start, end = start_time, end_time
+	ok = start != {} && end != {}
+	return
 }
 
 strings_equal :: proc(a, b: string) -> bool {
