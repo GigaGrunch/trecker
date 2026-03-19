@@ -176,9 +176,12 @@ main :: proc() {
 		}
 	}
 
-	command: string
+	command, sub_command: string
 	if len(os.args) > 1 {
 		command = os.args[1]
+	}
+	if len(os.args) > 2 {
+		sub_command = os.args[2]
 	}
 
 	if command == "" {
@@ -203,15 +206,40 @@ main :: proc() {
 			switch err in parse_err {
 			case flags.Parse_Error:
 				fmt.println(err.message)
-			case flags.Help_Request:
+			case flags.Help_Request: // TODO
 			case flags.Validation_Error:
 				fmt.println(err.message)
 			case flags.Open_File_Error:
 				fmt.println(err)
 			}
 		}
+	} else if strings_equal(command, "add") {
+		if sub_command == "" {
+			fmt.printfln("no sub command for `%v` given", command)
+		} else if strings_equal(sub_command, "entry") {
+			args: struct {
+				project_id: string `args:"pos=0,required"`,
+				time_range: string `args:"pos=1,required"`,
+			}
+			parse_err := flags.parse(&args, os.args[3:])
+			if parse_err == nil {
+				// TODO
+			} else {
+				switch err in parse_err {
+				case flags.Parse_Error:
+					fmt.println(err.message)
+				case flags.Help_Request: // TODO
+				case flags.Validation_Error:
+					fmt.println(err.message)
+				case flags.Open_File_Error:
+					fmt.println(err)
+				}
+			}
+		} else {
+			fmt.printfln("unknown `%v` sub-command `%v`", command, sub_command)
+		}
 	} else {
-		fmt.printfln("unknown command '%v'", command)
+		fmt.printfln("unknown command `%v`", command)
 	}
 }
 
