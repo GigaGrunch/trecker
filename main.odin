@@ -249,7 +249,10 @@ store_serialize :: proc(store: Store) {
 	}
 	fmt.sbprintln(&sb)
 
-	// TODO: sort entries by start time
+	slice.sort_by(store.entries[:], proc(a, b: Entry) -> bool {
+		return time.diff(a.start, b.start) > 0
+	})
+
 	for entry in store.entries {
 		start_str := time.time_to_rfc3339(entry.start, allocator=context.temp_allocator) or_else panic("TODO")
 		start_str = start_str[:len("yyyy-MM-ddThh:mm:ss")]
