@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:time"
 import "core:strings"
 import "core:flags"
+import "core:slice"
 
 startup_store: Store
 
@@ -187,8 +188,14 @@ main :: proc() {
 		parse_err := flags.parse(&args, os.args[2:])
 
 		if parse_err == nil {
-			fmt.printfln("Store contains %v projects:", len(startup_store.projects))
-			for project_id in startup_store.projects {
+			sorted_ids := make([dynamic]string, allocator=context.temp_allocator, cap=len(startup_store.projects), len=0)
+			for id in startup_store.projects {
+				append(&sorted_ids, id)
+			}
+			slice.sort(sorted_ids[:])
+
+			fmt.printfln("Store contains %v projects:", len(sorted_ids))
+			for project_id in sorted_ids {
 				project := startup_store.projects[project_id]
 				fmt.printfln("  %v: '%v'", project_id, project.name)
 			}
