@@ -4,6 +4,7 @@ import "core:os"
 import "core:fmt"
 import "core:time"
 import "core:strings"
+import "core:flags"
 
 startup_store: Store
 
@@ -172,6 +173,38 @@ main :: proc() {
 			assert(entry.project_id in startup_store.projects)
 			assert(entry.project_id in string_index_lookup)
 		}
+	}
+
+	command: string
+	if len(os.args) > 1 {
+		command = os.args[1]
+	}
+
+	if command == "" {
+		fmt.println("no command given")
+	} else if strings_equal(command, "list") {
+		args: struct {}
+		parse_err := flags.parse(&args, os.args[2:])
+
+		if parse_err == nil {
+			fmt.printfln("Store contains %v projects:", len(startup_store.projects))
+			for project_id in startup_store.projects {
+				project := startup_store.projects[project_id]
+				fmt.printfln("  %v: '%v'", project_id, project.name)
+			}
+		} else {
+			switch err in parse_err {
+			case flags.Parse_Error:
+				fmt.println(err.message)
+			case flags.Help_Request:
+			case flags.Validation_Error:
+				fmt.println(err.message)
+			case flags.Open_File_Error:
+				fmt.println(err)
+			}
+		}
+	} else {
+		fmt.printfln("unknown command '%v'", command)
 	}
 }
 
