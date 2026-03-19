@@ -175,10 +175,17 @@ main :: proc() {
 	free_all(context.temp_allocator)
 
 	Start :: Project_ID
+	List_Projects :: struct{}
+	Add_Project :: struct {
+		project_id: Project_ID,
+		project_name: string,
+	}
 	Add_Entry :: Entry
 
 	parsed_command: union {
 		Start,
+		List_Projects,
+		Add_Project,
 		Add_Entry,
 	}
 
@@ -210,6 +217,29 @@ main :: proc() {
 				add_entry.end = end
 				parsed_command = add_entry
 			}
+		} else if strings_equal(command_str, "list-projects") {
+			parsed_command = List_Projects{}
+		} else if strings_equal(command_str, "add-project") {
+			project_id := take_next_arg()
+			id_ok := project_id != "" && project_id not_in store.projects
+			if project_id == "" {
+				fmt.printfln("'project-id' is missing")
+			} else if !id_ok {
+				fmt.printfln("project '%v' is already defined", project_id)
+			}
+
+			project_name := take_next_arg()
+			name_ok := project_name != ""
+			if project_name == "" {
+				fmt.printfln("'project-name' is missing")
+			}
+
+			if id_ok && name_ok {
+				add_project: Add_Project
+				add_project.project_id = stable_string(project_id)
+				add_project.project_name = stable_string(project_name)
+				parsed_command = add_project
+			}
 		} else if strings_equal(command_str, "start") {
 			project_id := take_next_arg()
 			project_ok := project_id in store.projects
@@ -225,6 +255,8 @@ main :: proc() {
 		} else {
 			fmt.printfln("unknown command '%v'", command_str)
 		}
+
+		// TODO: check for excess arguments
 
 		if parsed_command == nil {
 			fmt.println("usage: TODO")
@@ -283,6 +315,20 @@ main :: proc() {
 			}
 			
 			fmt.println()
+		case List_Projects:
+			sorted_ids := slice.map_keys(store.projects, context.temp_allocator) or_else panic("TODO")
+			slice.sort(sorted_ids[:])
+
+			fmt.printfln("Listing %v projects:", len(store.projects))
+			for project_id in sorted_ids {
+				project := store.projects[project_id]
+				fmt.printfln("  %v: '%v'", project_id, project.name)
+			}
+		case Add_Project:
+			project: Project
+			project.name = command.project_name
+			store.projects[command.project_id] = project
+			store_serialize()
 		case Add_Entry:
 			entry := command
 			append(&store.entries, entry)
