@@ -15,8 +15,6 @@ main :: proc() {
 	}
 
 	{ // load store
-		defer free_all(context.temp_allocator)
-
 		file_data, read_file_err := os.read_entire_file(STORE_PATH, context.temp_allocator)
 		switch read_file_err {
 			case nil:
@@ -165,6 +163,8 @@ main :: proc() {
 		}
 	}
 
+	free_all(context.temp_allocator)
+
 	Add_Entry :: Entry
 
 	parsed_command: union {
@@ -209,6 +209,8 @@ main :: proc() {
 		}
 	}
 
+	free_all(context.temp_allocator)
+
 	{ // execute
 		switch command in parsed_command {
 		case Add_Entry:
@@ -223,7 +225,42 @@ main :: proc() {
 
 			new_entry := command
 			append(&output_store.entries, new_entry)
+
+			store_serialize(output_store)
 		}
+	}
+}
+
+store_serialize :: proc(store: Store) {
+	sb := strings.builder_make(context.temp_allocator)
+	
+	fmt.sbprintfln(&sb, "version: %v", STORE_VERSION)
+	fmt.sbprintln(&sb)
+
+	sorted_ids := make([dynamic]Project_ID, allocator=context.temp_allocator, cap=len(store.projects), len=0)
+	for project_id in store.projects {
+		append(&sorted_ids, project_id)
+	}
+	slice.sort(sorted_ids[:])
+
+	for project_id in sorted_ids {
+		project := store.projects[project_id]
+		fmt.sbprintfln(&sb, "project: %v '%v'", project_id, project.name)
+	}
+	fmt.sbprintln(&sb)
+
+	// TODO: sort entries by start time
+	for entry in store.entries {
+		start_str := time.time_to_rfc3339(entry.start, allocator=context.temp_allocator) or_else panic("TODO")
+		start_str = start_str[:len("yyyy-MM-ddThh:mm:ss")]
+		end_str := time.time_to_rfc3339(entry.end, allocator=context.temp_allocator) or_else panic("TODO")
+		end_str = end_str[:len("yyyy-MM-ddThh:mm:ss")]
+		fmt.sbprintfln(&sb, "entry: %v %v..%v", entry.project_id, start_str, end_str)
+	}
+
+	write_err := os.write_entire_file(STORE_PATH, strings.to_string(sb))
+	if write_err != nil {
+		fmt.panicf("TODO: %v", write_err)
 	}
 }
 
