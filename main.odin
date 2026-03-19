@@ -4,7 +4,6 @@ import "core:os"
 import "core:fmt"
 import "core:time"
 import "core:strings"
-import "core:flags"
 import "core:slice"
 
 startup_store: Store
@@ -166,105 +165,58 @@ main :: proc() {
 		}
 	}
 
+	Add_Entry :: Entry
+
+	command: union {
+		Add_Entry,
+	}
+
 	{ // command parsing
-		command, sub_command: string
-		if len(os.args) > 1 {
-			command = os.args[1]
-		}
-		if len(os.args) > 2 {
-			sub_command = os.args[2]
-		}
-
-		if command == "" {
-			fmt.println("no command given")
-		} else if strings_equal(command, "list") {
-			args: struct {}
-			parse_err := flags.parse(&args, os.args[2:])
-
-			if parse_err == nil {
-				sorted_ids := make([dynamic]string, allocator=context.temp_allocator, cap=len(startup_store.projects), len=0)
-				for id in startup_store.projects {
-					append(&sorted_ids, id)
-				}
-				slice.sort(sorted_ids[:])
-
-				fmt.printfln("Store contains %v projects:", len(sorted_ids))
-				for project_id in sorted_ids {
-					project := startup_store.projects[project_id]
-					fmt.printfln("  %v: '%v'", project_id, project.name)
-				}
-			} else {
-				switch err in parse_err {
-				case flags.Parse_Error:
-					fmt.println(err.message)
-				case flags.Help_Request: // TODO
-				case flags.Validation_Error:
-					fmt.println(err.message)
-				case flags.Open_File_Error:
-					fmt.println(err)
-				}
+		command_str := take_next_arg()
+		if command_str == "" {
+			fmt.println("'command' is missing")
+		} else if strings_equal(command_str, "add-entry") {
+			project_id := take_next_arg()
+			project_ok := project_id in startup_store.projects
+			if project_id == "" {
+				fmt.printfln("'project-id' is missing")
+			} else if !project_ok {
+				fmt.printfln("project '%v' is not defined", project_id)
 			}
-		} else if strings_equal(command, "add") {
-			if sub_command == "" {
-				fmt.printfln("no sub command for `%v` given", command)
-			} else if strings_equal(sub_command, "entry") {
-				args: struct {
-					project_id: Project_ID `args:"pos=0,required"`,
-					time_range: string `args:"pos=1,required"`,
-				}
-				parse_err := flags.parse(&args, os.args[3:])
-				if parse_err == nil {
-					project_ok := args.project_id in startup_store.projects
-					start, end, range_ok := parse_time_range(args.time_range)
 
-					if !project_ok {
-						fmt.printfln("project '%v' is not defined", args.project_id)
-					}
-					if !range_ok {
-						fmt.printfln("failed to parse time range from '%v'", args.time_range)
-					}
+			time_range := take_next_arg()
+			start, end, range_ok := parse_time_range(time_range)
+			if time_range == "" {
+				fmt.printfln("'time-range' is missing")
+			} else if !range_ok {
+				fmt.printfln("failed to parse time range from '%v'", time_range)
+			}
 
-					if project_ok && range_ok {
-						output_store: Store
-						output_store.projects.allocator = context.temp_allocator
-						output_store.entries.allocator = context.temp_allocator
-						
-						for project_id in startup_store.projects {
-							output_store.projects[project_id] = startup_store.projects[project_id]
-						}
-
-						for entry in startup_store.entries {
-							append(&output_store.entries, entry)
-						}
-
-						new_entry: Entry
-						new_entry.project_id = args.project_id
-						new_entry.start = start
-						new_entry.end = end
-						append(&output_store.entries, new_entry)
-
-						// TOOD: serialize
-					} else {
-						os.exit(1)
-					}
-				} else {
-					switch err in parse_err {
-					case flags.Parse_Error:
-						fmt.println(err.message)
-					case flags.Help_Request: // TODO
-					case flags.Validation_Error:
-						fmt.println(err.message)
-					case flags.Open_File_Error:
-						fmt.println(err)
-					}
-				}
-			} else {
-				fmt.printfln("unknown `%v` sub-command `%v`", command, sub_command)
+			if project_ok && range_ok {
+				add_entry: Add_Entry
+				add_entry.project_id = project_id
+				add_entry.start = start
+				add_entry.end = end
+				command = add_entry
 			}
 		} else {
-			fmt.printfln("unknown command `%v`", command)
+			fmt.printfln("unknown command '%v'", command_str)
+		}
+
+		if command == nil {
+			fmt.println("usage: TODO")
+			os.exit(1)
 		}
 	}
+}
+
+take_next_arg :: proc() -> (arg: string) {
+	@static next_arg_i := 1
+	if len(os.args) > next_arg_i {
+		arg = os.args[next_arg_i]
+	}
+	next_arg_i += 1
+	return
 }
 
 parse_time_range :: proc(value: string) -> (start, end: time.Time, ok: bool) {
