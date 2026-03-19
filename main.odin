@@ -167,7 +167,7 @@ main :: proc() {
 
 	Add_Entry :: Entry
 
-	command: union {
+	parsed_command: union {
 		Add_Entry,
 	}
 
@@ -194,18 +194,35 @@ main :: proc() {
 
 			if project_ok && range_ok {
 				add_entry: Add_Entry
-				add_entry.project_id = project_id
+				add_entry.project_id = stable_string(project_id)
 				add_entry.start = start
 				add_entry.end = end
-				command = add_entry
+				parsed_command = add_entry
 			}
 		} else {
 			fmt.printfln("unknown command '%v'", command_str)
 		}
 
-		if command == nil {
+		if parsed_command == nil {
 			fmt.println("usage: TODO")
 			os.exit(1)
+		}
+	}
+
+	{ // execute
+		switch command in parsed_command {
+		case Add_Entry:
+			output_store: Store
+			for project_id in startup_store.projects {
+				project := startup_store.projects[project_id]
+				output_store.projects[project_id] = project
+			}
+			for entry in startup_store.entries {
+				append(&output_store.entries, entry)
+			}
+
+			new_entry := command
+			append(&output_store.entries, new_entry)
 		}
 	}
 }
