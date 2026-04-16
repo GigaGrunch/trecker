@@ -1,3 +1,5 @@
+# ⚠️Moved to Codeberg: [https://codeberg.org/GigaGrunch/trecker](https://codeberg.org/GigaGrunch/trecker)
+
 # Building
 
 * Get the Odin compiler from https://odin-lang.org/
